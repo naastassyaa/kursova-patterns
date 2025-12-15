@@ -1335,6 +1335,22 @@ a {
   color: var(--text-muted);
 }
 
+.membership-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.membership-actions .ghost-button,
+.membership-actions .primary-button {
+  flex: 0 1 auto;
+  min-width: 120px;
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
 .membership-status-badge {
   padding: 0.3rem 0.65rem;
   border-radius: 999px;

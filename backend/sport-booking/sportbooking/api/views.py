@@ -1,5 +1,9 @@
 from decimal import Decimal
+from datetime import timedelta
+import secrets
 
+from django.db import models as django_models
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -11,6 +15,7 @@ from .models import (
     Booking,
     GymHall,
     LoyaltyAccount,
+    MembershipInvitation,
     Notification,
     Payment,
     ScheduleSlot,
@@ -30,6 +35,7 @@ from .serializers import (
     CustomTokenObtainPairSerializer,
     GymHallSerializer,
     LoyaltyAccountSerializer,
+    MembershipInvitationSerializer,
     NotificationSerializer,
     PublicGymHallSerializer,
     PublicScheduleSlotSerializer,
@@ -212,9 +218,13 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        queryset = UserMembership.objects.select_related("subscription", "user", "payment", "owner").prefetch_related("invitations")
         if self.request.user.role == User.Role.ADMIN:
-            return UserMembership.objects.select_related("subscription", "user", "payment")
-        return UserMembership.objects.filter(user=self.request.user).select_related("subscription", "payment")
+            return queryset
+        # Показуємо абонементи користувача + корпоративні абонементи, де він власник
+        return queryset.filter(
+            django_models.Q(user=self.request.user) | django_models.Q(owner=self.request.user)
+        )
 
     def perform_create(self, serializer):
         start_date = serializer.validated_data.get("start_date")
@@ -244,6 +254,11 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 )
 
         membership = serializer.save(user=user)
+        
+        # Для корпоративних абонементів встановлюємо owner
+        if membership.subscription.type == Subscription.SubscriptionType.CORPORATE and not membership.owner:
+            membership.owner = user
+            membership.save(update_fields=["owner"])
 
         # Create payment for the membership
         if membership.subscription and membership.subscription.price:
@@ -258,6 +273,162 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 user=user, amount=Decimal(membership.subscription.price)
             )
         NotificationService().send_membership_confirmation(membership)
+
+    @action(detail=True, methods=["post"])
+    def invite_user(self, request, pk=None):
+        """Запросити користувача до корпоративного абонементу"""
+        membership = self.get_object()
+        
+        if not membership.is_corporate:
+            return Response(
+                {"error": "Запрошення доступні тільки для корпоративних абонементів."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if membership.owner != request.user:
+            return Response(
+                {"error": "Тільки власник абонементу може запрошувати користувачів."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        email = request.data.get("email")
+        if not email:
+            return Response(
+                {"error": "Email обов'язковий."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Перевіряємо, чи не перевищено ліміт (5 користувачів для корпоративного)
+        team_count = UserMembership.objects.filter(
+            owner=membership.owner,
+            subscription=membership.subscription,
+            status=UserMembership.MembershipStatus.ACTIVE,
+        ).count()
+        
+        if team_count >= 5:
+            return Response(
+                {"error": "Досягнуто максимальну кількість користувачів (5) для корпоративного абонементу."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Перевіряємо, чи не існує вже запрошення
+        existing_invitation = MembershipInvitation.objects.filter(
+            membership=membership,
+            email=email,
+            status=MembershipInvitation.InvitationStatus.PENDING,
+        ).first()
+        
+        if existing_invitation:
+            return Response(
+                {"error": "Запрошення для цього email вже відправлено."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Створюємо запрошення
+        token = secrets.token_urlsafe(32)
+        expires_at = timezone.now() + timedelta(days=7)
+        
+        invitation = MembershipInvitation.objects.create(
+            membership=membership,
+            email=email,
+            invited_by=request.user,
+            token=token,
+            expires_at=expires_at,
+        )
+        
+        # Відправляємо сповіщення
+        NotificationService().send_invitation_notification(invitation)
+        
+        return Response(
+            MembershipInvitationSerializer(invitation).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["post"])
+    def accept_invitation(self, request):
+        """Прийняти запрошення до корпоративного абонементу"""
+        token = request.data.get("token")
+        if not token:
+            return Response(
+                {"error": "Token обов'язковий."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        try:
+            invitation = MembershipInvitation.objects.get(
+                token=token,
+                status=MembershipInvitation.InvitationStatus.PENDING,
+            )
+        except MembershipInvitation.DoesNotExist:
+            return Response(
+                {"error": "Запрошення не знайдено або вже використано."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        # Перевіряємо термін дії
+        if invitation.expires_at < timezone.now():
+            invitation.status = MembershipInvitation.InvitationStatus.EXPIRED
+            invitation.save(update_fields=["status"])
+            return Response(
+                {"error": "Запрошення прострочено."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Перевіряємо, чи email співпадає
+        if invitation.email.lower() != request.user.email.lower():
+            return Response(
+                {"error": "Це запрошення призначене для іншого користувача."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        # Перевіряємо ліміт
+        team_count = UserMembership.objects.filter(
+            owner=invitation.membership.owner,
+            subscription=invitation.membership.subscription,
+            status=UserMembership.MembershipStatus.ACTIVE,
+        ).count()
+        
+        if team_count >= 5:
+            return Response(
+                {"error": "Досягнуто максимальну кількість користувачів (5) для корпоративного абонементу."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        # Створюємо абонемент для запрошеного користувача
+        new_membership = UserMembership.objects.create(
+            user=request.user,
+            subscription=invitation.membership.subscription,
+            start_date=invitation.membership.start_date,
+            end_date=invitation.membership.end_date,
+            owner=invitation.membership.owner,
+            status=UserMembership.MembershipStatus.ACTIVE,
+        )
+        
+        # Оновлюємо статус запрошення
+        invitation.status = MembershipInvitation.InvitationStatus.ACCEPTED
+        invitation.save(update_fields=["status"])
+        
+        # Відправляємо сповіщення
+        NotificationService().send_membership_confirmation(new_membership)
+        
+        return Response(
+            UserMembershipSerializer(new_membership).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    @action(detail=False, methods=["get"])
+    def pending_invitations(self, request):
+        """Отримати список запрошень, які очікують прийняття для поточного користувача"""
+        invitations = MembershipInvitation.objects.filter(
+            email=request.user.email,
+            status=MembershipInvitation.InvitationStatus.PENDING,
+            expires_at__gt=timezone.now(),
+        ).select_related("membership", "membership__subscription", "invited_by")
+        
+        return Response(
+            MembershipInvitationSerializer(invitations, many=True).data,
+            status=status.HTTP_200_OK,
+        )
 
     def destroy(self, request, *args, **kwargs):
         membership = self.get_object()

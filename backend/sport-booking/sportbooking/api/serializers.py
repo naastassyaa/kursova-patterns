@@ -9,6 +9,7 @@ from .models import (
     GymHall,
     LoyaltyAccount,
     LoyaltyTier,
+    MembershipInvitation,
     Notification,
     Payment,
     ScheduleSlot,
@@ -120,6 +121,24 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = ["status", "transaction_id", "paid_at", "created_at", "updated_at"]
 
 
+class MembershipInvitationSerializer(serializers.ModelSerializer):
+    invited_by_name = serializers.CharField(source="invited_by.username", read_only=True)
+
+    class Meta:
+        model = MembershipInvitation
+        fields = [
+            "id",
+            "email",
+            "status",
+            "invited_by",
+            "invited_by_name",
+            "token",
+            "created_at",
+            "expires_at",
+        ]
+        read_only_fields = ["status", "created_at", "expires_at", "token"]
+
+
 class UserMembershipSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
     subscription_detail = SubscriptionSerializer(source="subscription", read_only=True)
@@ -134,6 +153,12 @@ class UserMembershipSerializer(serializers.ModelSerializer):
         write_only=True,
         default=Payment.PaymentMethod.CARD
     )
+    # Для корпоративних абонементів
+    owner = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False, allow_null=True)
+    owner_name = serializers.CharField(source="owner.username", read_only=True)
+    invitations = MembershipInvitationSerializer(many=True, read_only=True)
+    is_corporate = serializers.BooleanField(read_only=True)
+    team_members = serializers.SerializerMethodField()
 
     class Meta:
         model = UserMembership
@@ -150,8 +175,32 @@ class UserMembershipSerializer(serializers.ModelSerializer):
             "auto_renew",
             "payment",
             "payment_method",
+            "owner",
+            "owner_name",
+            "invitations",
+            "is_corporate",
+            "team_members",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
+
+    def get_team_members(self, obj):
+        """Повертає список користувачів, які використовують цей корпоративний абонемент"""
+        if not obj.is_corporate or not obj.owner:
+            return []
+        # Знаходимо всі абонементи з тим самим owner та subscription
+        team_memberships = UserMembership.objects.filter(
+            owner=obj.owner,
+            subscription=obj.subscription,
+            status=UserMembership.MembershipStatus.ACTIVE,
+        ).select_related("user")
+        return [
+            {
+                "id": m.user.id,
+                "username": m.user.username,
+                "email": m.user.email,
+            }
+            for m in team_memberships
+        ]
 
 
 class LoyaltyTierSerializer(serializers.ModelSerializer):

@@ -4,7 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List
 
-from ..models import Booking, Notification, Section, Subscription, User, UserMembership
+from ..models import Booking, MembershipInvitation, Notification, Section, Subscription, User, UserMembership
 
 logger = logging.getLogger(__name__)
 
@@ -133,4 +133,19 @@ class NotificationService:
                 message=message,
                 notif_type=Notification.NotificationType.PROMO,
             )
+
+    def send_invitation_notification(self, invitation: MembershipInvitation) -> None:
+        """Відправити сповіщення про запрошення до корпоративного абонементу."""
+        # Шукаємо користувача за email
+        try:
+            user = User.objects.get(email=invitation.email)
+            subject.notify(
+                user,
+                title="Запрошення до корпоративного абонементу",
+                message=f"Вас запрошено до корпоративного абонементу {invitation.membership.subscription.type}. Перевірте розділ 'Абонементи' для прийняття запрошення.",
+                notif_type=Notification.NotificationType.SYSTEM,
+            )
+        except User.DoesNotExist:
+            # Якщо користувача немає, логуємо (в майбутньому можна відправити email)
+            logger.info(f"Invitation sent to {invitation.email} (user not registered yet)")
 

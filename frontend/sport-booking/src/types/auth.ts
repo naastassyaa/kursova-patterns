@@ -35,6 +35,23 @@ export type SubscriptionDetail = {
   perks?: Record<string, unknown>;
 };
 
+export type MembershipInvitation = {
+  id: number;
+  email: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
+  invited_by: number;
+  invited_by_name?: string;
+  token: string;
+  created_at: string;
+  expires_at: string;
+};
+
+export type TeamMember = {
+  id: number;
+  username: string;
+  email: string;
+};
+
 export type Membership = {
   id: number;
   status: string;
@@ -42,6 +59,11 @@ export type Membership = {
   end_date: string;
   auto_renew: boolean;
   subscription_detail: SubscriptionDetail;
+  owner?: number;
+  owner_name?: string;
+  invitations?: MembershipInvitation[];
+  is_corporate?: boolean;
+  team_members?: TeamMember[];
 };
 
 export type ScheduleSlotDetail = {

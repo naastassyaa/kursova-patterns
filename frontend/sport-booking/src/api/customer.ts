@@ -4,6 +4,7 @@ import type {
   BookingPayload,
   LoyaltyAccount,
   Membership,
+  MembershipInvitation,
   Notification,
   SubscriptionPlan,
 } from '../types/auth';
@@ -60,6 +61,22 @@ export const updateMembership = async (
 
 export const deleteMembership = async (membershipId: number) => {
   await apiClient.delete(`/me/memberships/${membershipId}/`);
+};
+
+export const inviteUserToMembership = async (membershipId: number, email: string) => {
+  const { data } = await apiClient.post<MembershipInvitation>(
+    `/me/memberships/${membershipId}/invite_user/`,
+    { email },
+  );
+  return data;
+};
+
+export const acceptInvitation = async (token: string) => {
+  const { data } = await apiClient.post<Membership>(
+    '/me/memberships/accept_invitation/',
+    { token },
+  );
+  return data;
 };
 
 export const fetchSubscriptionPlans = async () => {

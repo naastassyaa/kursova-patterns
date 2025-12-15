@@ -149,9 +149,66 @@ class UserMembership(TimeStampedModel):
     end_date = models.DateField()
     status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.ACTIVE)
     auto_renew = models.BooleanField(default=False)
+    # Для корпоративних абонементів: власник абонементу (той, хто купив)
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="owned_memberships",
+        null=True,
+        blank=True,
+        help_text="Власник корпоративного абонементу",
+    )
 
     def __str__(self):
         return f"{self.user.username} - {self.subscription.type}"
+
+    @property
+    def is_corporate(self):
+        return self.subscription.type == Subscription.SubscriptionType.CORPORATE
+
+    @property
+    def is_owner(self):
+        """Перевіряє, чи є поточний користувач власником абонементу"""
+        return self.owner is not None and self.owner == self.user
+
+
+class MembershipInvitation(TimeStampedModel):
+    """
+    Запрошення користувачів до корпоративного абонементу.
+    """
+
+    class InvitationStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        REJECTED = "REJECTED", "Rejected"
+        EXPIRED = "EXPIRED", "Expired"
+
+    membership = models.ForeignKey(
+        UserMembership,
+        on_delete=models.CASCADE,
+        related_name="invitations",
+        help_text="Корпоративний абонемент, до якого запрошують",
+    )
+    email = models.EmailField(help_text="Email запрошеного користувача")
+    invited_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="sent_invitations",
+        help_text="Користувач, який надіслав запрошення",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=InvitationStatus.choices,
+        default=InvitationStatus.PENDING,
+    )
+    token = models.CharField(max_length=64, unique=True, help_text="Унікальний токен для прийняття запрошення")
+    expires_at = models.DateTimeField(help_text="Термін дії запрошення")
+
+    class Meta:
+        unique_together = [["membership", "email"]]
+
+    def __str__(self):
+        return f"Invitation to {self.email} for {self.membership}"
 
 
 class LoyaltyTier(TimeStampedModel):
