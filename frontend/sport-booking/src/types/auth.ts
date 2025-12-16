@@ -105,6 +105,14 @@ export type SubscriptionPlan = {
   duration: number;
   description?: string;
   perks?: Record<string, unknown>;
+  final_price?: number;
+  discount_amount?: number;
+  discount_percentage?: number;
+  promotion?: {
+    id: number;
+    title: string;
+    description: string;
+  } | null;
 };
 
 export type BookingPayload = {

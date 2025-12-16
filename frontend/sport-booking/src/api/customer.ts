@@ -114,4 +114,20 @@ export const updateMyProfile = async (payload: Partial<UserProfile>) => {
   return data;
 };
 
+export type Promotion = {
+  id: number;
+  title: string;
+  description: string;
+  scope: 'GENERAL' | 'PERSONAL';
+  discount_type: 'BOOKING' | 'SUBSCRIPTION' | 'INFO';
+  discount_value_type: 'PERCENTAGE' | 'FIXED';
+  discount_value: number | null;
+  start_date: string;
+  end_date: string;
+};
+
+export const fetchMyPromotions = async () => {
+  const { data } = await apiClient.get<Promotion[]>('/me/promotions/');
+  return data;
+};
 

@@ -8,10 +8,11 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Booking, Payment, ScheduleSlot, Subscription, User, UserMembership
+from ..models import Booking, Payment, Promotion, ScheduleSlot, Subscription, User, UserMembership
 from .loyalty import LoyaltyService
 from .notifications import NotificationService
 from .payments import PaymentService
+from .promotions import PromotionService
 
 
 class BookingService:
@@ -27,6 +28,7 @@ class BookingService:
         self.payment_service = PaymentService()
         self.loyalty_service = LoyaltyService()
         self.notification_service = NotificationService()
+        self.promotion_service = PromotionService()
 
     def create_booking(
         self,
@@ -141,8 +143,18 @@ class BookingService:
     def _calculate_price(self, user: User, slot: ScheduleSlot) -> Decimal:
         base_price = slot.section.base_price or Decimal("0.00")
         discount_multiplier = self._membership_discount(user)
-        price = (base_price * discount_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-        return price
+        price_with_membership = (base_price * discount_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        
+
+        final_price, discount, _ = self.promotion_service.get_final_price(
+            base_price=price_with_membership,
+            user=user,
+            discount_type=Promotion.DiscountType.BOOKING,
+            section=slot.section,
+            center=slot.hall.center if slot.hall else None,
+        )
+        
+        return final_price
 
     def _membership_discount(self, user: User) -> Decimal:
         today = timezone.now().date()

@@ -5,8 +5,12 @@ import { fetchHalls, fetchSections } from '../api/catalog';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 import { formatCurrency } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
+import PromotionsList from '../components/promotions/PromotionsList';
 
 const HomePage = () => {
+  const { isAuthenticated } = useAuth();
+  
   // Завантажуємо тільки обмежену кількість для відображення, не всі дані
   const sectionsQuery = useQuery({
     queryKey: ['sections', 'home'],
@@ -79,6 +83,8 @@ const HomePage = () => {
           </article>
         </div>
       </section>
+
+      {isAuthenticated && <PromotionsList />}
 
       {sectionsQuery.data && sectionsQuery.data.length > 0 && (
         <section className="detail-card">

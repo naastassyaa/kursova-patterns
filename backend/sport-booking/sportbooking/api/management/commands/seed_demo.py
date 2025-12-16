@@ -60,7 +60,6 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Demo data successfully created."))
 
-    # --- creation helpers -------------------------------------------------
     def _reset_data(self):
         Payment.objects.all().delete()
         Booking.objects.all().delete()
@@ -78,7 +77,6 @@ class Command(BaseCommand):
 
     def _create_centers(self):
         centers_data = [
-            # Львів - 2 центри
             {
                 "name": "Спортивна арена Львів",
                 "city": "Львів",
@@ -95,7 +93,6 @@ class Command(BaseCommand):
                 "email": "lviv2@fitness.ua",
                 "opening_hours": "06:00 - 22:00",
             },
-            # Київ - 2 центри
             {
                 "name": "Спортивний комплекс Київ",
                 "city": "Київ",
@@ -112,7 +109,6 @@ class Command(BaseCommand):
                 "email": "kyiv2@activelife.ua",
                 "opening_hours": "07:00 - 22:00",
             },
-            # Тернопіль - 1 центр
             {
                 "name": "Спорт центр Тернопіль",
                 "city": "Тернопіль",
@@ -121,7 +117,6 @@ class Command(BaseCommand):
                 "email": "ternopil@sportcenter.ua",
                 "opening_hours": "07:00 - 22:00",
             },
-            # Луцьк - 1 центр
             {
                 "name": "Спортивна база Луцьк",
                 "city": "Луцьк",
@@ -130,7 +125,6 @@ class Command(BaseCommand):
                 "email": "lutsk@sportbase.ua",
                 "opening_hours": "08:00 - 21:00",
             },
-            # Чернівці - 1 центр
             {
                 "name": "Фітнес клуб Чернівці",
                 "city": "Чернівці",
@@ -152,9 +146,7 @@ class Command(BaseCommand):
 
     def _create_halls(self, centers):
         halls = []
-        # All centers have the same set of halls (Зал 1, Зал 2, etc.)
-        # Each hall can host different types of classes
-        num_halls = 5  # 5 halls per center
+        num_halls = 5
 
         for center in centers:
             for hall_num in range(1, num_halls + 1):
@@ -163,7 +155,7 @@ class Command(BaseCommand):
                     name=f"Зал {hall_num}",
                     defaults={
                         "type": "Універсальна зала",
-                        "capacity": 15,  # Standard capacity, can be adjusted per section
+                        "capacity": 15,
                         "equipment": "Універсальне спортивне обладнання",
                         "availability": "Щоденно 08:00-22:00",
                     },
@@ -172,16 +164,13 @@ class Command(BaseCommand):
         return halls
 
     def _create_trainers(self, centers, halls):
-        # Create unique trainers for each center - no repetition between centers
         trainers = []
 
-        # Sports that need trainers - expanded list
         sports_needed = [
             "Футбол", "Йога", "Фітнес", "Баскетбол", "Плавання",
             "Теніс", "Волейбол", "Бокс", "Аеробіка"
         ]
 
-        # Extended Ukrainian first and last names pool to ensure uniqueness
         first_names = [
             "Олександр", "Андрій", "Сергій", "Дмитро", "Іван", "Максим", "Володимир",
             "Роман", "Віталій", "Олег", "Юрій", "Василь", "Петро", "Михайло",
@@ -195,18 +184,15 @@ class Command(BaseCommand):
             "Левченко", "Клименко", "Романенко", "Павленко", "Кравчук", "Овчаренко", "Гончаренко"
         ]
 
-        # Track used name combinations per center to ensure uniqueness
         used_names_per_center = {}
 
         for center_idx, center in enumerate(centers):
             center_used_names = used_names_per_center.setdefault(center.id, set())
             center_trainer_index = 0
 
-            # Create trainers for each sport - we need at least 3 per sport per center
+
             for sport_idx, sport in enumerate(sports_needed):
-                for trainer_num in range(3):  # Create 3 trainers per sport
-                    # Generate unique name combination for this center
-                    # Use center index and sport index to ensure uniqueness across centers
+                for trainer_num in range(3):
                     base_offset = center_idx * 1000 + sport_idx * 100 + trainer_num * 10
 
                     max_attempts = 100
@@ -219,7 +205,6 @@ class Command(BaseCommand):
                         last_name = last_names[last_idx]
                         name_key = f"{first_name}_{last_name}"
 
-                        # Check if this name combination is already used in this center
                         if name_key not in center_used_names:
                             center_used_names.add(name_key)
                             break
@@ -227,7 +212,6 @@ class Command(BaseCommand):
                         center_trainer_index += 1
                         attempt += 1
 
-                    # If we couldn't find unique name, use index-based approach with center offset
                     if attempt >= max_attempts:
                         first_name = first_names[(base_offset + center_trainer_index) % len(first_names)]
                         last_name = last_names[
@@ -252,7 +236,6 @@ class Command(BaseCommand):
     def _create_sections(self, halls, trainers):
         sections = []
 
-        # Define all levels and age categories
         levels = ["Початковий", "Середній", "Просунутий"]
         adult_age = "Дорослі"
         kids_ages = {
@@ -267,7 +250,6 @@ class Command(BaseCommand):
             "Аеробіка": ["Діти 8-12", "Діти 13-17"],
         }
 
-        # Prices and capacities per sport
         sport_configs = {
             "Футбол": {
                 "adult_price": Decimal("450.00"),
@@ -325,7 +307,6 @@ class Command(BaseCommand):
             },
         }
 
-        # Group halls by center
         halls_by_center = {}
         for hall in halls:
             center_id = hall.center_id
@@ -333,27 +314,23 @@ class Command(BaseCommand):
                 halls_by_center[center_id] = []
             halls_by_center[center_id].append(hall)
 
-        # Get all sports
         all_sports = list(sport_configs.keys())
 
-        # For each center, create ALL section combinations for ALL sports
         for center_id, center_halls in halls_by_center.items():
-            # Get trainers for this center
             center_trainers = {sport: [] for sport in all_sports}
             for trainer in trainers:
                 if trainer.center_id == center_id:
                     if trainer.specialization in center_trainers:
                         center_trainers[trainer.specialization].append(trainer)
 
-            # For each sport, create all section combinations
             for sport in all_sports:
                 config = sport_configs[sport]
                 sport_trainers = center_trainers.get(sport, [])
 
-                # Generate all section combinations for this sport
+
                 sport_sections = []
 
-                # Add all adult level combinations
+
                 for level in levels:
                     sport_sections.append((
                         sport, level, adult_age,
@@ -361,7 +338,7 @@ class Command(BaseCommand):
                         config["adult_capacity"]
                     ))
 
-                # Add all kids level combinations
+
                 for kids_age in kids_ages.get(sport, []):
                     for level in levels:
                         sport_sections.append((
@@ -370,17 +347,15 @@ class Command(BaseCommand):
                             config["kids_capacity"]
                         ))
 
-                # Distribute sections across halls and assign trainers
-                # Each section gets 1 trainer, distribute 3 trainers across all sections
+
                 for section_idx, (sport_type, level, age, base_price, capacity) in enumerate(sport_sections):
-                    # Assign to a hall (distribute evenly)
+
                     hall = center_halls[section_idx % len(center_halls)]
 
-                    # Assign 1 trainer (cycle through 3 trainers)
                     if len(sport_trainers) > 0:
                         assigned_trainer = sport_trainers[section_idx % len(sport_trainers)]
                     else:
-                        # Fallback if no trainers (shouldn't happen)
+
                         assigned_trainer = None
 
                     section, _ = Section.objects.get_or_create(
@@ -401,7 +376,7 @@ class Command(BaseCommand):
                         section.capacity = capacity
                         section.save(update_fields=["capacity"])
 
-                    # Assign 1 trainer to this section
+
                     if assigned_trainer:
                         section.trainers.set([assigned_trainer])
 
@@ -413,150 +388,137 @@ class Command(BaseCommand):
         slots = []
         now = timezone.now()
 
-        # Fixed schedule mapping: each combination gets specific days
-        # Format: (sport, level, age_category) -> (day1, day2) where 0=Monday, 6=Sunday
-        # This ensures consistent schedule for each section type
 
-        # Define fixed schedule patterns based on sport, level, and age
-        # Pattern: (sport, level, age_category) -> (day1, day2, hour1, hour2)
-        # Hours are between 10-18 for adults, 10-16 for kids
         schedule_patterns = {
-            # Adults schedules - hours 10-18
-            ("Футбол", "Початковий", "Дорослі"): (1, 4, 16, 17),  # Tuesday, Friday, 4 PM, 5 PM
-            ("Футбол", "Середній", "Дорослі"): (2, 5, 17, 18),  # Wednesday, Saturday, 5 PM, 6 PM
-            ("Футбол", "Просунутий", "Дорослі"): (0, 3, 18, 18),  # Monday, Thursday, 6 PM
 
-            ("Йога", "Початковий", "Дорослі"): (1, 4, 10, 11),  # Tuesday, Friday, 10 AM, 11 AM
-            ("Йога", "Середній", "Дорослі"): (2, 5, 11, 12),  # Wednesday, Saturday, 11 AM, 12 PM
-            ("Йога", "Просунутий", "Дорослі"): (0, 3, 10, 10),  # Monday, Thursday, 10 AM
+            ("Футбол", "Початковий", "Дорослі"): (1, 4, 16, 17),
+            ("Футбол", "Середній", "Дорослі"): (2, 5, 17, 18),
+            ("Футбол", "Просунутий", "Дорослі"): (0, 3, 18, 18),
 
-            ("Фітнес", "Початковий", "Дорослі"): (1, 4, 16, 17),  # Tuesday, Friday, 4 PM, 5 PM
-            ("Фітнес", "Середній", "Дорослі"): (2, 5, 17, 18),  # Wednesday, Saturday, 5 PM, 6 PM
-            ("Фітнес", "Просунутий", "Дорослі"): (0, 3, 18, 18),  # Monday, Thursday, 6 PM
+            ("Йога", "Початковий", "Дорослі"): (1, 4, 10, 11),
+            ("Йога", "Середній", "Дорослі"): (2, 5, 11, 12),
+            ("Йога", "Просунутий", "Дорослі"): (0, 3, 10, 10),
 
-            ("Баскетбол", "Початковий", "Дорослі"): (1, 4, 15, 16),  # Tuesday, Friday, 3 PM, 4 PM
-            ("Баскетбол", "Середній", "Дорослі"): (2, 5, 16, 17),  # Wednesday, Saturday, 4 PM, 5 PM
-            ("Баскетбол", "Просунутий", "Дорослі"): (0, 3, 17, 18),  # Monday, Thursday, 5 PM, 6 PM
+            ("Фітнес", "Початковий", "Дорослі"): (1, 4, 16, 17),
+            ("Фітнес", "Середній", "Дорослі"): (2, 5, 17, 18),
+            ("Фітнес", "Просунутий", "Дорослі"): (0, 3, 18, 18),
 
-            ("Плавання", "Початковий", "Дорослі"): (1, 4, 10, 12),  # Tuesday, Friday, 10 AM, 12 PM
-            ("Плавання", "Середній", "Дорослі"): (2, 5, 11, 13),  # Wednesday, Saturday, 11 AM, 1 PM
-            ("Плавання", "Просунутий", "Дорослі"): (0, 3, 12, 14),  # Monday, Thursday, 12 PM, 2 PM
+            ("Баскетбол", "Початковий", "Дорослі"): (1, 4, 15, 16),
+            ("Баскетбол", "Середній", "Дорослі"): (2, 5, 16, 17),
+            ("Баскетбол", "Просунутий", "Дорослі"): (0, 3, 17, 18),
 
-            ("Теніс", "Початковий", "Дорослі"): (1, 4, 14, 15),  # Tuesday, Friday, 2 PM, 3 PM
-            ("Теніс", "Середній", "Дорослі"): (2, 5, 15, 16),  # Wednesday, Saturday, 3 PM, 4 PM
-            ("Теніс", "Просунутий", "Дорослі"): (0, 3, 16, 17),  # Monday, Thursday, 4 PM, 5 PM
+            ("Плавання", "Початковий", "Дорослі"): (1, 4, 10, 12),
+            ("Плавання", "Середній", "Дорослі"): (2, 5, 11, 13),
+            ("Плавання", "Просунутий", "Дорослі"): (0, 3, 12, 14),
 
-            ("Волейбол", "Початковий", "Дорослі"): (1, 4, 15, 16),  # Tuesday, Friday, 3 PM, 4 PM
-            ("Волейбол", "Середній", "Дорослі"): (2, 5, 16, 17),  # Wednesday, Saturday, 4 PM, 5 PM
-            ("Волейбол", "Просунутий", "Дорослі"): (0, 3, 17, 18),  # Monday, Thursday, 5 PM, 6 PM
+            ("Теніс", "Початковий", "Дорослі"): (1, 4, 14, 15),
+            ("Теніс", "Середній", "Дорослі"): (2, 5, 15, 16),
+            ("Теніс", "Просунутий", "Дорослі"): (0, 3, 16, 17),
 
-            ("Бокс", "Початковий", "Дорослі"): (1, 4, 16, 17),  # Tuesday, Friday, 4 PM, 5 PM
-            ("Бокс", "Середній", "Дорослі"): (2, 5, 17, 18),  # Wednesday, Saturday, 5 PM, 6 PM
-            ("Бокс", "Просунутий", "Дорослі"): (0, 3, 18, 18),  # Monday, Thursday, 6 PM
+            ("Волейбол", "Початковий", "Дорослі"): (1, 4, 15, 16),
+            ("Волейбол", "Середній", "Дорослі"): (2, 5, 16, 17),
+            ("Волейбол", "Просунутий", "Дорослі"): (0, 3, 17, 18),
 
-            ("Аеробіка", "Початковий", "Дорослі"): (1, 4, 10, 11),  # Tuesday, Friday, 10 AM, 11 AM
-            ("Аеробіка", "Середній", "Дорослі"): (2, 5, 11, 12),  # Wednesday, Saturday, 11 AM, 12 PM
-            ("Аеробіка", "Просунутий", "Дорослі"): (0, 3, 12, 13),  # Monday, Thursday, 12 PM, 1 PM
+            ("Бокс", "Початковий", "Дорослі"): (1, 4, 16, 17),
+            ("Бокс", "Середній", "Дорослі"): (2, 5, 17, 18),
+            ("Бокс", "Просунутий", "Дорослі"): (0, 3, 18, 18),
+
+            ("Аеробіка", "Початковий", "Дорослі"): (1, 4, 10, 11),
+            ("Аеробіка", "Середній", "Дорослі"): (2, 5, 11, 12),
+            ("Аеробіка", "Просунутий", "Дорослі"): (0, 3, 12, 13),
         }
 
-        # Kids schedules - hours 10-16
         kids_schedule_base = {
-            ("Футбол", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Футбол", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Футбол", "Просунутий"): (4, 5, 14, 15),  # Friday, Saturday, 2 PM, 3 PM
+            ("Футбол", "Початковий"): (0, 2, 14, 15),
+            ("Футбол", "Середній"): (1, 3, 15, 16),
+            ("Футбол", "Просунутий"): (4, 5, 14, 15),
 
-            ("Йога", "Початковий"): (0, 2, 10, 11),  # Monday, Wednesday, 10 AM, 11 AM
-            ("Йога", "Середній"): (1, 3, 11, 12),  # Tuesday, Thursday, 11 AM, 12 PM
-            ("Йога", "Просунутий"): (4, 5, 12, 13),  # Friday, Saturday, 12 PM, 1 PM
+            ("Йога", "Початковий"): (0, 2, 10, 11),
+            ("Йога", "Середній"): (1, 3, 11, 12),
+            ("Йога", "Просунутий"): (4, 5, 12, 13),
 
-            ("Фітнес", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Фітнес", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Фітнес", "Просунутий"): (4, 5, 13, 14),  # Friday, Saturday, 1 PM, 2 PM
+            ("Фітнес", "Початковий"): (0, 2, 14, 15),
+            ("Фітнес", "Середній"): (1, 3, 15, 16),
+            ("Фітнес", "Просунутий"): (4, 5, 13, 14),
 
-            ("Баскетбол", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Баскетбол", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Баскетбол", "Просунутий"): (4, 5, 14, 15),  # Friday, Saturday, 2 PM, 3 PM
+            ("Баскетбол", "Початковий"): (0, 2, 14, 15),
+            ("Баскетбол", "Середній"): (1, 3, 15, 16),
+            ("Баскетбол", "Просунутий"): (4, 5, 14, 15),
 
-            ("Плавання", "Початковий"): (0, 2, 10, 12),  # Monday, Wednesday, 10 AM, 12 PM
-            ("Плавання", "Середній"): (1, 3, 11, 13),  # Tuesday, Thursday, 11 AM, 1 PM
-            ("Плавання", "Просунутий"): (4, 5, 14, 15),  # Friday, Saturday, 2 PM, 3 PM
+            ("Плавання", "Початковий"): (0, 2, 10, 12),
+            ("Плавання", "Середній"): (1, 3, 11, 13),
+            ("Плавання", "Просунутий"): (4, 5, 14, 15),
 
-            ("Теніс", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Теніс", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Теніс", "Просунутий"): (4, 5, 14, 15),  # Friday, Saturday, 2 PM, 3 PM
+            ("Теніс", "Початковий"): (0, 2, 14, 15),
+            ("Теніс", "Середній"): (1, 3, 15, 16),
+            ("Теніс", "Просунутий"): (4, 5, 14, 15),
 
-            ("Волейбол", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Волейбол", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Волейбол", "Просунутий"): (4, 5, 13, 14),  # Friday, Saturday, 1 PM, 2 PM
+            ("Волейбол", "Початковий"): (0, 2, 14, 15),
+            ("Волейбол", "Середній"): (1, 3, 15, 16),
+            ("Волейбол", "Просунутий"): (4, 5, 13, 14),
 
-            ("Бокс", "Початковий"): (0, 2, 14, 15),  # Monday, Wednesday, 2 PM, 3 PM
-            ("Бокс", "Середній"): (1, 3, 15, 16),  # Tuesday, Thursday, 3 PM, 4 PM
-            ("Бокс", "Просунутий"): (4, 5, 13, 14),  # Friday, Saturday, 1 PM, 2 PM
+            ("Бокс", "Початковий"): (0, 2, 14, 15),
+            ("Бокс", "Середній"): (1, 3, 15, 16),
+            ("Бокс", "Просунутий"): (4, 5, 13, 14),
 
-            ("Аеробіка", "Початковий"): (0, 2, 10, 11),  # Monday, Wednesday, 10 AM, 11 AM
-            ("Аеробіка", "Середній"): (1, 3, 11, 12),  # Tuesday, Thursday, 11 AM, 12 PM
-            ("Аеробіка", "Просунутий"): (4, 5, 12, 13),  # Friday, Saturday, 12 PM, 1 PM
+            ("Аеробіка", "Початковий"): (0, 2, 10, 11),
+            ("Аеробіка", "Середній"): (1, 3, 11, 12),
+            ("Аеробіка", "Просунутий"): (4, 5, 12, 13),
         }
 
-        # Create schedule slots: 2 classes per week for each section
         for section in sections:
             hall = section.hall
             center = hall.center
 
-            # Get the trainer for this section (should be 1 trainer)
             section_trainers = list(section.trainers.all())
             if len(section_trainers) == 0:
-                continue  # Skip if no trainer assigned
-            trainer = section_trainers[0]  # Use the single assigned trainer
+                continue
+            trainer = section_trainers[0]
 
-            # Determine schedule based on section type AND center
-            # Each center gets different schedule for the same section type
             is_kids = "Діти" in section.ageCategory
             section_key = (section.sportType, section.level, section.ageCategory)
 
-            # Use center ID to create different schedules for each center
-            center_offset = center.id % 3  # 0, 1, or 2 for variety
+            center_offset = center.id % 3
 
             if is_kids:
-                # For kids, use base pattern and apply to all kids age groups
+
                 kids_key = (section.sportType, section.level)
                 if kids_key in kids_schedule_base:
                     base_day1, base_day2, base_hour1, base_hour2 = kids_schedule_base[kids_key]
-                    # Vary days and hours based on center (different schedule per center)
+
                     day1 = (base_day1 + center_offset) % 7
                     day2 = (base_day2 + center_offset * 2) % 7
-                    # Hours between 10-16 for kids, vary by center
+
                     hour1 = max(10, min(16, base_hour1 + (center_offset % 2)))
                     hour2 = max(10, min(16, base_hour2 + (center_offset % 2)))
                 else:
-                    # Fallback
+
                     day1 = (0 + center_offset) % 7
                     day2 = (2 + center_offset * 2) % 7
                     hour1 = 10 + (center_offset % 3)
                     hour2 = 14 + (center_offset % 2)
             else:
-                # For adults - hours between 10-18
+
                 if section_key in schedule_patterns:
                     base_day1, base_day2, base_hour1, base_hour2 = schedule_patterns[section_key]
-                    # Vary days and hours based on center (different schedule per center)
+
                     day1 = (base_day1 + center_offset) % 7
                     day2 = (base_day2 + center_offset * 2) % 7
-                    # Hours between 10-18, vary by center
+
                     hour1 = max(10, min(18, base_hour1 + (center_offset % 2)))
                     hour2 = max(10, min(18, base_hour2 + (center_offset % 2)))
                 else:
-                    # Fallback
+
                     day1 = (1 + center_offset) % 7
                     day2 = (4 + center_offset * 2) % 7
                     hour1 = 10 + (center_offset * 2)
                     hour2 = 14 + (center_offset * 2)
 
-            # Create exactly 2 slots for the next 7 days
-            # Find the first occurrence of each day in the next 7 days
+
             days_to_create = [(day1, hour1), (day2, hour2)]
 
             for target_day_of_week, target_hour in days_to_create:
-                # Find the first occurrence of this day in the next 7 days
+
                 for day_offset in range(1, 8):
                     target_date = now + timedelta(days=day_offset)
                     if target_date.weekday() == target_day_of_week:
@@ -573,7 +535,7 @@ class Command(BaseCommand):
                             available_spots=section.capacity,
                         )
                         slots.append(slot)
-                        break  # Found the day, move to next day
+                        break
 
         return slots
 
@@ -633,7 +595,7 @@ class Command(BaseCommand):
         admin, created = User.objects.get_or_create(
             email=admin_email,
             defaults={
-                "username": admin_email,  # Використовуємо email як username для сумісності з фронтендом
+                "username": admin_email,
                 "role": User.Role.ADMIN,
                 "is_staff": True,
                 "is_superuser": True,
@@ -641,7 +603,7 @@ class Command(BaseCommand):
             },
         )
         if created or not admin.has_usable_password():
-            admin.username = admin_email  # Оновлюємо username на email
+            admin.username = admin_email
             admin.set_password("admin12345")
             admin.is_staff = True
             admin.is_superuser = True
@@ -653,7 +615,7 @@ class Command(BaseCommand):
             ("demo_user", "demo@sportbooking.local"),
             ("corporate_user", "corp@sportbooking.local"),
         ]
-        # Встановлюємо дату народження для дорослих користувачів (25 років тому)
+
         from datetime import date
         adult_birth_date = date.today().replace(year=date.today().year - 25)
 
@@ -667,7 +629,7 @@ class Command(BaseCommand):
                     "date_of_birth": adult_birth_date,
                 },
             )
-            # Оновлюємо дату народження, якщо вона не встановлена
+
             if not user.date_of_birth:
                 user.date_of_birth = adult_birth_date
                 user.save(update_fields=['date_of_birth'])
@@ -697,13 +659,13 @@ class Command(BaseCommand):
         booking_service = BookingService()
         customer_users = [u for u in users if u.role == User.Role.CUSTOMER]
 
-        # Фільтруємо слоти, щоб брати тільки дорослі секції
+
         adult_slots = [
             slot for slot in slots
             if slot.section.ageCategory == "Дорослі"
         ]
 
-        # Якщо немає дорослих слотів, беремо всі
+
         slots_to_use = adult_slots if adult_slots else slots
 
         for slot in slots_to_use[:20]:
@@ -716,7 +678,6 @@ class Command(BaseCommand):
                     notes="Тестове бронювання",
                 )
             except Exception as e:
-                # Пропускаємо помилки при створенні бронювань (наприклад, якщо слот вже заброньований)
                 self.stdout.write(self.style.WARNING(f"Пропущено бронювання для слота {slot.id}: {e}"))
                 continue
 

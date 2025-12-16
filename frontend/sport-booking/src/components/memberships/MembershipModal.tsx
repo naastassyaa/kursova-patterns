@@ -270,9 +270,47 @@ const MembershipModal = ({ plans, onClose, initialPlanId = null }: MembershipMod
 
             <p className="selected-plan__meta">
 
-              {activePlan?.duration} днів · {activePlan ? formatCurrency(activePlan.price) : '—'}
+              {activePlan?.duration} днів ·{' '}
+              {activePlan ? (
+                <>
+                  {activePlan.final_price !== undefined && activePlan.final_price < parseFloat(activePlan.price) ? (
+                    <>
+                      <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', marginRight: '0.5rem' }}>
+                        {formatCurrency(activePlan.price)}
+                      </span>
+                      <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                        {formatCurrency(activePlan.final_price.toString())}
+                      </span>
+                      {activePlan.discount_percentage && (
+                        <span
+                          style={{
+                            marginLeft: '0.5rem',
+                            padding: '0.25rem 0.5rem',
+                            borderRadius: '0.5rem',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            color: 'var(--success)',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          -{Math.round(activePlan.discount_percentage)}%
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    formatCurrency(activePlan.price)
+                  )}
+                </>
+              ) : (
+                '—'
+              )}
 
             </p>
+            {activePlan?.promotion && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--primary)' }}>
+                🎉 {activePlan.promotion.title}
+              </p>
+            )}
 
           </div>
 

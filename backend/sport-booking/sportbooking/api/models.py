@@ -149,7 +149,6 @@ class UserMembership(TimeStampedModel):
     end_date = models.DateField()
     status = models.CharField(max_length=20, choices=MembershipStatus.choices, default=MembershipStatus.ACTIVE)
     auto_renew = models.BooleanField(default=False)
-    # Для корпоративних абонементів: власник абонементу (той, хто купив)
     owner = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -358,3 +357,109 @@ class Notification(TimeStampedModel):
 
     def __str__(self):
         return f"{self.user.username} - {self.title}"
+
+
+class Promotion(TimeStampedModel):
+
+    class PromotionScope(models.TextChoices):
+        GENERAL = "GENERAL", "Загальна"
+        PERSONAL = "PERSONAL", "Персональна"
+
+    class DiscountType(models.TextChoices):
+        BOOKING = "BOOKING", "На бронювання"
+        SUBSCRIPTION = "SUBSCRIPTION", "На абонемент"
+        INFO = "INFO", "Інформаційна"
+
+    class DiscountValueType(models.TextChoices):
+        PERCENTAGE = "PERCENTAGE", "Відсоток"
+        FIXED = "FIXED", "Фіксована сума"
+
+    title = models.CharField(max_length=255, help_text="Заголовок акції")
+    description = models.TextField(help_text="Опис акції")
+    scope = models.CharField(
+        max_length=20,
+        choices=PromotionScope.choices,
+        default=PromotionScope.GENERAL,
+        help_text="Загальна або персональна акція",
+    )
+    discount_type = models.CharField(
+        max_length=20,
+        choices=DiscountType.choices,
+        default=DiscountType.INFO,
+        help_text="Тип знижки",
+    )
+    discount_value_type = models.CharField(
+        max_length=20,
+        choices=DiscountValueType.choices,
+        default=DiscountValueType.PERCENTAGE,
+        help_text="Тип значення знижки",
+    )
+    discount_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Значення знижки (відсоток або фіксована сума)",
+    )
+    start_date = models.DateTimeField(help_text="Дата початку акції")
+    end_date = models.DateTimeField(help_text="Дата закінчення акції")
+    is_active = models.BooleanField(default=True, help_text="Чи активна акція")
+    target_user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="personal_promotions",
+        null=True,
+        blank=True,
+        help_text="Цільовий користувач для персональної акції",
+    )
+    target_subscription = models.ForeignKey(
+        Subscription,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Цільовий абонемент (якщо знижка тільки на конкретний тип)",
+    )
+    target_center = models.ForeignKey(
+        SportCenter,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Цільовий центр (якщо знижка тільки на конкретний центр)",
+    )
+    target_section = models.ForeignKey(
+        Section,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="Цільова секція (якщо знижка тільки на конкретну секцію)",
+    )
+    target_age_category = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Вікова категорія (Adults, Kids, або порожньо для всіх)",
+    )
+
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.title} ({self.get_scope_display()})"
+
+    def is_valid_now(self):
+        now = timezone.now()
+        return (
+            self.is_active
+            and self.start_date <= now <= self.end_date
+        )
+
+    def calculate_discount(self, base_price: Decimal) -> Decimal:
+        if not self.discount_value or not self.is_valid_now():
+            return Decimal("0.00")
+
+        if self.discount_value_type == self.DiscountValueType.PERCENTAGE:
+            discount = (base_price * self.discount_value) / Decimal("100.00")
+        else:
+            discount = self.discount_value
+
+        return min(discount, base_price)

@@ -18,6 +18,7 @@ from .models import (
     MembershipInvitation,
     Notification,
     Payment,
+    Promotion,
     ScheduleSlot,
     Section,
     SportCenter,
@@ -37,9 +38,12 @@ from .serializers import (
     LoyaltyAccountSerializer,
     MembershipInvitationSerializer,
     NotificationSerializer,
+    PromotionSerializer,
     PublicGymHallSerializer,
+    PublicPromotionSerializer,
     PublicScheduleSlotSerializer,
     PublicSectionSerializer,
+    PublicSubscriptionSerializer,
     SectionSerializer,
     SportCenterSerializer,
     SubscriptionSerializer,
@@ -99,6 +103,56 @@ class ScheduleSlotAdminViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
 
 
+class PromotionAdminViewSet(viewsets.ModelViewSet):
+    queryset = Promotion.objects.select_related("target_user", "target_subscription", "target_center", "target_section").all().order_by("-start_date", "-created_at")
+    serializer_class = PromotionSerializer
+    permission_classes = [IsAdminUser]
+    
+    def perform_create(self, serializer):
+        target_user_email = serializer.validated_data.pop('target_user', None)
+        target_user = None
+        if target_user_email:
+            target_user = User.objects.get(email=target_user_email)
+
+        start_date = serializer.validated_data.get('start_date')
+        end_date = serializer.validated_data.get('end_date')
+        
+        if start_date and isinstance(start_date, str):
+            from datetime import datetime
+            serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date and isinstance(end_date, str):
+            from datetime import datetime
+            serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        
+        if target_user:
+            serializer.validated_data['target_user'] = target_user
+        else:
+            serializer.validated_data['target_user'] = None
+        
+        serializer.save()
+    
+    def perform_update(self, serializer):
+        target_user_email = serializer.validated_data.pop('target_user', None)
+        target_user = None
+        if target_user_email:
+            target_user = User.objects.get(email=target_user_email)
+
+        start_date = serializer.validated_data.get('start_date')
+        end_date = serializer.validated_data.get('end_date')
+        
+        if start_date and isinstance(start_date, str):
+            from datetime import datetime
+            serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date and isinstance(end_date, str):
+            from datetime import datetime
+            serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        
+        if target_user_email is not None:
+            serializer.validated_data['target_user'] = target_user
+        
+        serializer.save()
+
+
 class MembershipAdminViewSet(viewsets.ModelViewSet):
     queryset = UserMembership.objects.select_related("user", "subscription")
     serializer_class = UserMembershipSerializer
@@ -139,8 +193,36 @@ class PublicScheduleSlotViewSet(viewsets.ReadOnlyModelViewSet):
 
 class PublicSubscriptionViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Subscription.objects.all().order_by("type")
-    serializer_class = SubscriptionSerializer
+    serializer_class = PublicSubscriptionSerializer
     permission_classes = [permissions.AllowAny]
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
+
+class PublicPromotionViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = PublicPromotionSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        from .models import Promotion
+        from django.db import models
+        
+        user = self.request.user
+        now = timezone.now()
+
+        queryset = Promotion.objects.filter(
+            is_active=True,
+            start_date__lte=now,
+            end_date__gte=now,
+        ).filter(
+            models.Q(scope=Promotion.PromotionScope.GENERAL) |
+            models.Q(scope=Promotion.PromotionScope.PERSONAL, target_user=user)
+        )
+        
+        return queryset.order_by("-start_date", "-created_at")
 
 
 # --- User Features ---
@@ -167,7 +249,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     def cancel(self, request, pk=None):
         booking = self.get_object()
         from .services.booking import BookingService
-        from .services.loyalty import LoyaltyService
 
         service = BookingService()
         service.cancel_booking(booking)
@@ -259,7 +340,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
         if membership.subscription.type == Subscription.SubscriptionType.CORPORATE and not membership.owner:
             membership.owner = user
             membership.save(update_fields=["owner"])
-
+        
         # Create payment for the membership
         if membership.subscription and membership.subscription.price:
             payment_service = PaymentService()
@@ -297,8 +378,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 {"error": "Email обов'язковий."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        # Перевіряємо, чи не перевищено ліміт (5 користувачів для корпоративного)
+
         team_count = UserMembership.objects.filter(
             owner=membership.owner,
             subscription=membership.subscription,
@@ -310,8 +390,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 {"error": "Досягнуто максимальну кількість користувачів (5) для корпоративного абонементу."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        # Перевіряємо, чи не існує вже запрошення
+
         existing_invitation = MembershipInvitation.objects.filter(
             membership=membership,
             email=email,
@@ -323,8 +402,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 {"error": "Запрошення для цього email вже відправлено."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        # Створюємо запрошення
+
         token = secrets.token_urlsafe(32)
         expires_at = timezone.now() + timedelta(days=7)
         
@@ -335,8 +413,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
             token=token,
             expires_at=expires_at,
         )
-        
-        # Відправляємо сповіщення
+
         NotificationService().send_invitation_notification(invitation)
         
         return Response(
@@ -346,7 +423,6 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"])
     def accept_invitation(self, request):
-        """Прийняти запрошення до корпоративного абонементу"""
         token = request.data.get("token")
         if not token:
             return Response(
@@ -364,8 +440,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 {"error": "Запрошення не знайдено або вже використано."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        
-        # Перевіряємо термін дії
+
         if invitation.expires_at < timezone.now():
             invitation.status = MembershipInvitation.InvitationStatus.EXPIRED
             invitation.save(update_fields=["status"])
@@ -374,14 +449,14 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         
-        # Перевіряємо, чи email співпадає
+
         if invitation.email.lower() != request.user.email.lower():
             return Response(
                 {"error": "Це запрошення призначене для іншого користувача."},
                 status=status.HTTP_403_FORBIDDEN,
             )
         
-        # Перевіряємо ліміт
+
         team_count = UserMembership.objects.filter(
             owner=invitation.membership.owner,
             subscription=invitation.membership.subscription,
@@ -394,7 +469,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         
-        # Створюємо абонемент для запрошеного користувача
+
         new_membership = UserMembership.objects.create(
             user=request.user,
             subscription=invitation.membership.subscription,
@@ -404,11 +479,11 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
             status=UserMembership.MembershipStatus.ACTIVE,
         )
         
-        # Оновлюємо статус запрошення
+
         invitation.status = MembershipInvitation.InvitationStatus.ACCEPTED
         invitation.save(update_fields=["status"])
         
-        # Відправляємо сповіщення
+
         NotificationService().send_membership_confirmation(new_membership)
         
         return Response(
@@ -418,7 +493,7 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def pending_invitations(self, request):
-        """Отримати список запрошень, які очікують прийняття для поточного користувача"""
+
         invitations = MembershipInvitation.objects.filter(
             email=request.user.email,
             status=MembershipInvitation.InvitationStatus.PENDING,

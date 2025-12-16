@@ -135,8 +135,6 @@ class NotificationService:
             )
 
     def send_invitation_notification(self, invitation: MembershipInvitation) -> None:
-        """Відправити сповіщення про запрошення до корпоративного абонементу."""
-        # Шукаємо користувача за email
         try:
             user = User.objects.get(email=invitation.email)
             subject.notify(
@@ -146,6 +144,5 @@ class NotificationService:
                 notif_type=Notification.NotificationType.SYSTEM,
             )
         except User.DoesNotExist:
-            # Якщо користувача немає, логуємо (в майбутньому можна відправити email)
             logger.info(f"Invitation sent to {invitation.email} (user not registered yet)")
 

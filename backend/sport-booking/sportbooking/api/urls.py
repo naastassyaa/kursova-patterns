@@ -10,7 +10,9 @@ from .views import (
     MembershipAdminViewSet,
     MyMembershipViewSet,
     NotificationViewSet,
+    PromotionAdminViewSet,
     PublicGymHallViewSet,
+    PublicPromotionViewSet,
     PublicScheduleSlotViewSet,
     PublicSectionViewSet,
     PublicSportCenterViewSet,
@@ -33,6 +35,7 @@ admin_router.register(r'sections', SectionAdminViewSet, basename='admin-section'
 admin_router.register(r'schedules', ScheduleSlotAdminViewSet, basename='admin-schedule')
 admin_router.register(r'subscriptions', SubscriptionAdminViewSet, basename='admin-subscription')
 admin_router.register(r'memberships', MembershipAdminViewSet, basename='admin-membership')
+admin_router.register(r'promotions', PromotionAdminViewSet, basename='admin-promotion')
 
 # Router for Public Catalog endpoints
 public_router = DefaultRouter()
@@ -49,6 +52,7 @@ user_router.register(r'memberships', MyMembershipViewSet, basename='user-members
 user_router.register(r'notifications', NotificationViewSet, basename='user-notification')
 user_router.register(r'loyalty', LoyaltyAccountViewSet, basename='user-loyalty')
 user_router.register(r'profile', UserProfileViewSet, basename='user-profile')
+user_router.register(r'promotions', PublicPromotionViewSet, basename='user-promotion')
 
 urlpatterns = [
     path('admin/', include(admin_router.urls)),

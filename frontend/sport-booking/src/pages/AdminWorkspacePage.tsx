@@ -254,6 +254,153 @@ const resources: AdminResourceConfig[] = [
       },
     ],
   },
+  {
+    key: 'promotions',
+    title: 'Акції',
+    endpoint: 'promotions',
+    columns: [
+      { key: 'title', label: 'Заголовок' },
+      {
+        key: 'scope',
+        label: 'Тип',
+        render: (row) => (row.scope === 'GENERAL' ? 'Загальна' : 'Персональна'),
+      },
+      {
+        key: 'discount_type',
+        label: 'Тип знижки',
+        render: (row) => {
+          const types: Record<string, string> = {
+            BOOKING: 'На бронювання',
+            SUBSCRIPTION: 'На абонемент',
+            INFO: 'Інформаційна',
+          };
+          return types[row.discount_type] || row.discount_type;
+        },
+      },
+      {
+        key: 'discount_value',
+        label: 'Знижка',
+        render: (row) => {
+          if (!row.discount_value) return '—';
+          const valueType = row.discount_value_type === 'PERCENTAGE' ? '%' : 'грн';
+          return `${row.discount_value} ${valueType}`;
+        },
+      },
+      {
+        key: 'start_date',
+        label: 'Початок',
+        render: (row) => new Date(row.start_date).toLocaleDateString(),
+      },
+      {
+        key: 'end_date',
+        label: 'Кінець',
+        render: (row) => new Date(row.end_date).toLocaleDateString(),
+      },
+      {
+        key: 'target_center_name',
+        label: 'Центр',
+        render: (row) => row.target_center_name ?? '—',
+      },
+      {
+        key: 'target_age_category',
+        label: 'Вікова категорія',
+        render: (row) => {
+          if (!row.target_age_category) return 'Всі';
+          const categories: Record<string, string> = {
+            'Adults': 'Дорослі',
+            'Kids': 'Діти',
+          };
+          return categories[row.target_age_category] || row.target_age_category;
+        },
+      },
+      {
+        key: 'is_valid',
+        label: 'Дійсна',
+        render: (row) => (row.is_valid ? 'Так' : 'Ні'),
+      },
+    ],
+    fields: [
+      { name: 'title', label: 'Заголовок', type: 'text', required: true },
+      { name: 'description', label: 'Опис', type: 'textarea', required: true },
+      {
+        name: 'scope',
+        label: 'Тип акції',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'Загальна', value: 'GENERAL' },
+          { label: 'Персональна', value: 'PERSONAL' },
+        ],
+      },
+      {
+        name: 'discount_type',
+        label: 'Тип знижки',
+        type: 'select',
+        required: true,
+        options: [
+          { label: 'На бронювання', value: 'BOOKING' },
+          { label: 'На абонемент', value: 'SUBSCRIPTION' },
+          { label: 'Інформаційна', value: 'INFO' },
+        ],
+      },
+      {
+        name: 'discount_value_type',
+        label: 'Тип значення знижки',
+        type: 'select',
+        options: [
+          { label: 'Відсоток', value: 'PERCENTAGE' },
+          { label: 'Фіксована сума', value: 'FIXED' },
+        ],
+      },
+      { name: 'discount_value', label: 'Значення знижки', type: 'number' },
+      { name: 'start_date', label: 'Дата початку', type: 'date', required: true },
+      { name: 'end_date', label: 'Дата закінчення', type: 'date', required: true },
+      {
+        name: 'target_user',
+        label: 'Email користувача',
+        type: 'text',
+        showIf: (values) => values.scope === 'PERSONAL',
+      },
+      {
+        name: 'target_subscription',
+        label: 'Цільовий абонемент',
+        type: 'select',
+        optionsEndpoint: 'subscriptions',
+        optionLabelKey: 'type',
+        optionValueKey: 'id',
+        showIf: (values) => values.discount_type === 'SUBSCRIPTION',
+      },
+      {
+        name: 'target_center',
+        label: 'Цільовий центр',
+        type: 'select',
+        optionsEndpoint: 'centers',
+        optionLabelKey: 'name',
+        optionValueKey: 'id',
+        showIf: (values) => values.discount_type === 'BOOKING',
+      },
+      {
+        name: 'target_section',
+        label: 'Цільова секція (опціонально)',
+        type: 'select',
+        optionsEndpoint: 'sections',
+        optionLabelKey: 'sportType',
+        optionValueKey: 'id',
+        showIf: (values) => values.discount_type === 'BOOKING' && values.target_center,
+      },
+      {
+        name: 'target_age_category',
+        label: 'Вікова категорія',
+        type: 'select',
+        options: [
+          { label: 'Всі', value: '' },
+          { label: 'Дорослі', value: 'Adults' },
+          { label: 'Діти', value: 'Kids' },
+        ],
+        showIf: (values) => values.discount_type === 'BOOKING',
+      },
+    ],
+  },
 ];
 
 const AdminWorkspacePage = () => {

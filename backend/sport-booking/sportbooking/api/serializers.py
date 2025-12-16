@@ -12,6 +12,7 @@ from .models import (
     MembershipInvitation,
     Notification,
     Payment,
+    Promotion,
     ScheduleSlot,
     Section,
     SportCenter,
@@ -101,9 +102,101 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class PublicSubscriptionSerializer(serializers.ModelSerializer):
+    """Публічний serializer для абонементів з інформацією про знижки."""
+    
+    final_price = serializers.SerializerMethodField()
+    discount_amount = serializers.SerializerMethodField()
+    discount_percentage = serializers.SerializerMethodField()
+    promotion = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Subscription
+        fields = [
+            "id",
+            "type",
+            "price",
+            "duration",
+            "description",
+            "perks",
+            "final_price",
+            "discount_amount",
+            "discount_percentage",
+            "promotion",
+        ]
+    
+    def get_final_price(self, obj):
+        """Розраховує фінальну ціну з урахуванням акцій."""
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return float(obj.price)
+        
+        from .services.promotions import PromotionService
+        from ..models import Promotion
+        
+        promotion_service = PromotionService()
+        final_price, discount, promotion = promotion_service.get_final_price(
+            base_price=obj.price,
+            user=request.user,
+            discount_type=Promotion.DiscountType.SUBSCRIPTION,
+            subscription=obj,
+        )
+        return float(final_price)
+    
+    def get_discount_amount(self, obj):
+        """Розраховує суму знижки."""
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        
+        from .services.promotions import PromotionService
+        from ..models import Promotion
+        
+        promotion_service = PromotionService()
+        _, discount, _ = promotion_service.get_final_price(
+            base_price=obj.price,
+            user=request.user,
+            discount_type=Promotion.DiscountType.SUBSCRIPTION,
+            subscription=obj,
+        )
+        return float(discount) if discount > 0 else None
+    
+    def get_discount_percentage(self, obj):
+        """Розраховує відсоток знижки."""
+        discount_amount = self.get_discount_amount(obj)
+        if discount_amount is None or discount_amount == 0:
+            return None
+        return float((discount_amount / obj.price) * 100)
+    
+    def get_promotion(self, obj):
+        """Повертає інформацію про застосовану акцію."""
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        
+        from .services.promotions import PromotionService
+        from ..models import Promotion
+        
+        promotion_service = PromotionService()
+        _, _, promotion = promotion_service.get_final_price(
+            base_price=obj.price,
+            user=request.user,
+            discount_type=Promotion.DiscountType.SUBSCRIPTION,
+            subscription=obj,
+        )
+        
+        if promotion:
+            return {
+                "id": promotion.id,
+                "title": promotion.title,
+                "description": promotion.description,
+            }
+        return None
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     """Serializer for Payment model - supports both booking and membership payments."""
-
+    
     class Meta:
         model = Payment
         fields = [
@@ -392,7 +485,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     """Serializer for updating user profile (excluding sensitive fields)."""
-
+    
     class Meta:
         model = User
         fields = (
@@ -416,3 +509,94 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         return super().update(instance, validated_data)
+
+
+class PublicPromotionSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = Promotion
+        fields = [
+            "id",
+            "title",
+            "description",
+            "scope",
+            "discount_type",
+            "discount_value_type",
+            "discount_value",
+            "start_date",
+            "end_date",
+        ]
+
+
+class PromotionSerializer(serializers.ModelSerializer):
+
+    target_user_email = serializers.SerializerMethodField()
+    target_subscription_type = serializers.SerializerMethodField()
+    target_center_name = serializers.SerializerMethodField()
+    target_section_name = serializers.SerializerMethodField()
+    is_valid = serializers.SerializerMethodField()
+    target_user = serializers.EmailField(write_only=True, required=False, allow_null=True)
+
+    class Meta:
+        model = Promotion
+        fields = [
+            "id",
+            "title",
+            "description",
+            "scope",
+            "discount_type",
+            "discount_value_type",
+            "discount_value",
+            "start_date",
+            "end_date",
+            "is_active",
+            "target_user",
+            "target_user_email",
+            "target_subscription",
+            "target_subscription_type",
+            "target_center",
+            "target_center_name",
+            "target_section",
+            "target_section_name",
+            "target_age_category",
+            "is_valid",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_target_user_email(self, obj):
+        return obj.target_user.email if obj.target_user else None
+
+    def get_target_subscription_type(self, obj):
+        return obj.target_subscription.get_type_display() if obj.target_subscription else None
+
+    def get_target_center_name(self, obj):
+        if obj.target_center:
+            return f"{obj.target_center.name} ({obj.target_center.city})"
+        return None
+
+    def get_target_section_name(self, obj):
+        if obj.target_section:
+            section_info = f"{obj.target_section.sportType} ({obj.target_section.level})"
+            if obj.target_section.hall:
+                center_name = obj.target_section.hall.center.name if obj.target_section.hall.center else ''
+                hall_name = obj.target_section.hall.name
+                if center_name:
+                    section_info += f" · {hall_name} ({center_name})"
+                else:
+                    section_info += f" · {hall_name}"
+            return section_info
+        return None
+
+    def get_is_valid(self, obj):
+        return obj.is_valid_now()
+    
+    def validate_target_user(self, value):
+
+        if value:
+            from ..models import User
+            try:
+                User.objects.get(email=value)
+            except User.DoesNotExist:
+                raise serializers.ValidationError(f"Користувач з email {value} не знайдений")
+        return value
