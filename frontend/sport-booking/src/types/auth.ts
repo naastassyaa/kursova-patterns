@@ -79,6 +79,21 @@ export type ScheduleSlotDetail = {
     sportType: string;
     level: string;
   };
+  trainer?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    specialization: string;
+  } | null;
+  price?: string;
+  final_price?: number;
+  discount_amount?: number;
+  discount_percentage?: number;
+  promotion?: {
+    id: number;
+    title: string;
+    description: string;
+  } | null;
 };
 
 export type PaymentMethod = 'CARD' | 'APPLE_PAY' | 'GOOGLE_PAY' | 'CASH';

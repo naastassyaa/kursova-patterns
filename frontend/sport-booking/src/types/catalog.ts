@@ -53,6 +53,14 @@ export type ScheduleSlot = {
   end_time: string;
   available_spots: number;
   price: string;
+  final_price?: number;
+  discount_amount?: number;
+  discount_percentage?: number;
+  promotion?: {
+    id: number;
+    title: string;
+    description: string;
+  } | null;
 };
 
 export type CatalogFilters = {

@@ -270,7 +270,6 @@ const resources: AdminResourceConfig[] = [
         label: 'Тип знижки',
         render: (row) => {
           const types: Record<string, string> = {
-            BOOKING: 'На бронювання',
             SUBSCRIPTION: 'На абонемент',
             INFO: 'Інформаційна',
           };
@@ -289,12 +288,26 @@ const resources: AdminResourceConfig[] = [
       {
         key: 'start_date',
         label: 'Початок',
-        render: (row) => new Date(row.start_date).toLocaleDateString(),
+        render: (row) => {
+          const date = new Date(row.start_date);
+          const year = date.getUTCFullYear();
+          const month = date.getUTCMonth();
+          const day = date.getUTCDate();
+          const localDate = new Date(year, month, day);
+          return localDate.toLocaleDateString('uk-UA');
+        },
       },
       {
         key: 'end_date',
         label: 'Кінець',
-        render: (row) => new Date(row.end_date).toLocaleDateString(),
+        render: (row) => {
+          const date = new Date(row.end_date);
+          const year = date.getUTCFullYear();
+          const month = date.getUTCMonth();
+          const day = date.getUTCDate();
+          const localDate = new Date(year, month, day);
+          return localDate.toLocaleDateString('uk-UA');
+        },
       },
       {
         key: 'target_center_name',
@@ -311,6 +324,14 @@ const resources: AdminResourceConfig[] = [
             'Kids': 'Діти',
           };
           return categories[row.target_age_category] || row.target_age_category;
+        },
+      },
+      {
+        key: 'target_subscription_type',
+        label: 'Цільовий абонемент',
+        render: (row) => {
+          if (row.discount_type !== 'SUBSCRIPTION') return '—';
+          return row.target_subscription_type ?? 'Всі';
         },
       },
       {
@@ -338,7 +359,6 @@ const resources: AdminResourceConfig[] = [
         type: 'select',
         required: true,
         options: [
-          { label: 'На бронювання', value: 'BOOKING' },
           { label: 'На абонемент', value: 'SUBSCRIPTION' },
           { label: 'Інформаційна', value: 'INFO' },
         ],
@@ -371,15 +391,6 @@ const resources: AdminResourceConfig[] = [
         showIf: (values) => values.discount_type === 'SUBSCRIPTION',
       },
       {
-        name: 'target_center',
-        label: 'Цільовий центр',
-        type: 'select',
-        optionsEndpoint: 'centers',
-        optionLabelKey: 'name',
-        optionValueKey: 'id',
-        showIf: (values) => values.discount_type === 'BOOKING',
-      },
-      {
         name: 'target_section',
         label: 'Цільова секція (опціонально)',
         type: 'select',
@@ -397,7 +408,7 @@ const resources: AdminResourceConfig[] = [
           { label: 'Дорослі', value: 'Adults' },
           { label: 'Діти', value: 'Kids' },
         ],
-        showIf: (values) => values.discount_type === 'BOOKING',
+        showIf: () => false,
       },
     ],
   },

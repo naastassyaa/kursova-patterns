@@ -53,7 +53,20 @@ const SlotExplorer = ({ slots, onSelectSlot }: SlotExplorerProps) => {
                       {slot.available_spots} місць
                     </span>
                     <span className="badge">{slot.hall.center.city}</span>
-                    <span className="badge">{formatCurrency(slot.price)}</span>
+                    <span className="badge">
+                      {slot.final_price !== undefined && slot.final_price !== null && slot.final_price < Number(slot.price) ? (
+                        <>
+                          <span style={{ textDecoration: 'line-through', marginRight: '0.25rem', opacity: 0.7 }}>
+                            {formatCurrency(slot.price)}
+                          </span>
+                          <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                            {formatCurrency(slot.final_price.toString())}
+                          </span>
+                        </>
+                      ) : (
+                        formatCurrency(slot.price)
+                      )}
+                    </span>
                   </div>
                   {onSelectSlot && (
                     <button

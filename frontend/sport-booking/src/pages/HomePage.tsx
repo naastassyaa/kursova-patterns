@@ -130,7 +130,7 @@ const HomePage = () => {
         <section className="detail-card">
           <h2>Наші локації</h2>
           <p style={{ color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
-            Ми працюємо у 5+ містах з 10+ спортивними центрами
+            Ми працюємо у 5+ містах з 7 спортивними центрами
           </p>
           <div className="sections-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))' }}>
             {hallsQuery.data.map((hall) => {

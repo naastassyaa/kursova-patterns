@@ -162,6 +162,9 @@ const BookingsPanel = ({
                   <p className="booking-title">
                     {booking.schedule_slot_detail.section.sportType} ·{' '}
                     {booking.schedule_slot_detail.section.level}
+                    {booking.notes && booking.notes.includes('Персональне тренування') && booking.schedule_slot_detail.trainer && (
+                      <> · Персональне тренування з {booking.schedule_slot_detail.trainer.first_name} {booking.schedule_slot_detail.trainer.last_name}</>
+                    )}
                   </p>
                   <p className="booking-card__meta">
                     {booking.schedule_slot_detail.hall.center_name ?? 'Центр'} ·{' '}

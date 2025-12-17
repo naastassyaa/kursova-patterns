@@ -6,6 +6,7 @@ import { fetchSections } from '../api/catalog';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 import SectionList from '../components/catalog/SectionList';
+import { formatCurrency } from '../utils/formatters';
 
 const TrainerPage = () => {
   const { trainerId } = useParams<{ trainerId: string }>();
@@ -60,6 +61,9 @@ const TrainerPage = () => {
               <Link to={`/centers/${trainer.center_detail.id}`}>{trainer.center_detail.name}</Link>
             </span>
           )}
+          <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+            Персональне тренування: {formatCurrency(1500)}
+          </span>
         </div>
         {trainer.biography && <p>{trainer.biography}</p>}
       </section>

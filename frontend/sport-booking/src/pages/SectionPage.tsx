@@ -3,6 +3,7 @@ import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchScheduleSlots, fetchSectionById } from '../api/catalog';
+import { fetchMyPromotions } from '../api/customer';
 import LoadingState from '../components/common/LoadingState';
 import ErrorState from '../components/common/ErrorState';
 import SlotExplorer from '../components/slots/SlotExplorer';
@@ -38,6 +39,27 @@ const SectionPage = () => {
     enabled: Boolean(section?.sportType),
   });
 
+  const {
+    data: promotions,
+  } = useQuery({
+    queryKey: ['my-promotions'],
+    queryFn: fetchMyPromotions,
+    enabled: isAuthenticated,
+  });
+
+  const sectionPromotions = useMemo(() => {
+    if (!promotions || !section) return [];
+    return promotions.filter(
+      (promo) => {
+        const matchesType = promo.discount_type === 'BOOKING';
+        const matchesScope = promo.scope === 'GENERAL';
+        const matchesSection = !promo.target_section || promo.target_section === section.id;
+        
+        return matchesType && matchesScope && matchesSection;
+      }
+    );
+  }, [promotions, section]);
+
   const sectionSlots = useMemo(
     () => slots?.filter((slot) => slot.section.id === section?.id) ?? [],
     [slots, section?.id],
@@ -69,6 +91,18 @@ const SectionPage = () => {
           <span>Хол: {section.hall_name}</span>
           <span>Вартість: {formatCurrency(section.base_price)}</span>
         </div>
+        {sectionPromotions.length > 0 && (
+          <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: 'rgba(16, 185, 129, 0.1)', borderRadius: '0.5rem' }}>
+            {sectionPromotions.map((promo) => (
+              <div key={promo.id} style={{ marginBottom: '0.5rem' }}>
+                <p style={{ fontWeight: 600, color: 'var(--success)', marginBottom: '0.25rem' }}>
+                  🎉 {promo.title}
+                </p>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{promo.description}</p>
+              </div>
+            ))}
+          </div>
+        )}
         {section.description && <p className="detail-card__description">{section.description}</p>}
       </section>
 

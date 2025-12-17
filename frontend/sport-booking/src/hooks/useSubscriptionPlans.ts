@@ -24,11 +24,12 @@ const readCache = (): SubscriptionPlan[] => {
 export const useSubscriptionPlans = () => {
   const cached = useMemo(() => readCache(), []);
 
-  const query = useQuery({
+  const query = useQuery<SubscriptionPlan[]>({
     queryKey: ['catalog', 'subscriptions'],
     queryFn: fetchSubscriptionPlans,
     retry: false,
-    staleTime: 1000 * 60 * 10,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   useEffect(() => {
@@ -37,8 +38,8 @@ export const useSubscriptionPlans = () => {
     }
   }, [query.data]);
 
-  const rawPlans = query.data ?? cached;
-  const plans = rawPlans.filter((plan) => plan.type !== 'SINGLE');
+  const rawPlans: SubscriptionPlan[] = query.data ?? cached;
+  const plans = rawPlans.filter((plan: SubscriptionPlan) => plan.type !== 'SINGLE');
 
   return {
     plans,

@@ -124,6 +124,9 @@ export type Promotion = {
   discount_value: number | null;
   start_date: string;
   end_date: string;
+  target_section?: number | null;
+  target_center?: number | null;
+  target_age_category?: string | null;
 };
 
 export const fetchMyPromotions = async () => {

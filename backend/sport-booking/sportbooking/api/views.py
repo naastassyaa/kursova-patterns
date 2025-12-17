@@ -117,17 +117,22 @@ class PromotionAdminViewSet(viewsets.ModelViewSet):
         start_date = serializer.validated_data.get('start_date')
         end_date = serializer.validated_data.get('end_date')
         
-        if start_date and isinstance(start_date, str):
-            from datetime import datetime
-            serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        if end_date and isinstance(end_date, str):
-            from datetime import datetime
-            serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        if start_date is not None:
+            if isinstance(start_date, str):
+                from datetime import datetime
+                serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        if end_date is not None:
+            if isinstance(end_date, str):
+                from datetime import datetime
+                serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
         
-        if target_user:
+        if target_user_email is not None:
             serializer.validated_data['target_user'] = target_user
         else:
             serializer.validated_data['target_user'] = None
+        
+        if 'target_subscription' not in serializer.validated_data or serializer.validated_data.get('target_subscription') is None:
+            serializer.validated_data['target_subscription'] = None
         
         serializer.save()
     
@@ -137,18 +142,36 @@ class PromotionAdminViewSet(viewsets.ModelViewSet):
         if target_user_email:
             target_user = User.objects.get(email=target_user_email)
 
-        start_date = serializer.validated_data.get('start_date')
-        end_date = serializer.validated_data.get('end_date')
+        instance = serializer.instance
         
-        if start_date and isinstance(start_date, str):
-            from datetime import datetime
-            serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-        if end_date and isinstance(end_date, str):
-            from datetime import datetime
-            serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        if 'start_date' in serializer.validated_data:
+            start_date = serializer.validated_data.get('start_date')
+            if start_date is not None:
+                if isinstance(start_date, str):
+                    from datetime import datetime
+                    serializer.validated_data['start_date'] = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+        elif instance and instance.start_date:
+            serializer.validated_data['start_date'] = instance.start_date
+            
+        if 'end_date' in serializer.validated_data:
+            end_date = serializer.validated_data.get('end_date')
+            if end_date is not None:
+                if isinstance(end_date, str):
+                    from datetime import datetime
+                    serializer.validated_data['end_date'] = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        elif instance and instance.end_date:
+            serializer.validated_data['end_date'] = instance.end_date
         
         if target_user_email is not None:
             serializer.validated_data['target_user'] = target_user
+        elif target_user_email is None and 'target_user' not in serializer.validated_data:
+            serializer.validated_data['target_user'] = None
+        
+        if 'target_subscription' not in serializer.validated_data:
+            if instance and instance.target_subscription:
+                serializer.validated_data['target_subscription'] = instance.target_subscription
+            else:
+                serializer.validated_data['target_subscription'] = None
         
         serializer.save()
 
@@ -184,11 +207,16 @@ class PublicSectionViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PublicScheduleSlotViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = ScheduleSlot.objects.select_related("section", "hall", "trainer")
+    queryset = ScheduleSlot.objects.select_related("section", "hall", "hall__center", "trainer")
     serializer_class = PublicScheduleSlotSerializer
     permission_classes = [permissions.AllowAny]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["section__sportType", "hall__center__city", "hall", "trainer"]
+    
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
 
 
 class PublicSubscriptionViewSet(viewsets.ReadOnlyModelViewSet):
@@ -302,7 +330,6 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
         queryset = UserMembership.objects.select_related("subscription", "user", "payment", "owner").prefetch_related("invitations")
         if self.request.user.role == User.Role.ADMIN:
             return queryset
-        # Показуємо абонементи користувача + корпоративні абонементи, де він власник
         return queryset.filter(
             django_models.Q(user=self.request.user) | django_models.Q(owner=self.request.user)
         )
@@ -336,22 +363,32 @@ class MyMembershipViewSet(viewsets.ModelViewSet):
 
         membership = serializer.save(user=user)
         
-        # Для корпоративних абонементів встановлюємо owner
         if membership.subscription.type == Subscription.SubscriptionType.CORPORATE and not membership.owner:
             membership.owner = user
             membership.save(update_fields=["owner"])
         
         # Create payment for the membership
         if membership.subscription and membership.subscription.price:
+            from .services.promotions import PromotionService
+            from .models import Promotion
+            
+            promotion_service = PromotionService()
+            final_price, discount_amount, applied_promotion = promotion_service.get_final_price(
+                base_price=Decimal(membership.subscription.price),
+                user=user,
+                discount_type=Promotion.DiscountType.SUBSCRIPTION,
+                subscription=membership.subscription,
+            )
+            
             payment_service = PaymentService()
             payment_service.create_membership_payment(
                 membership=membership,
                 method=payment_method,
-                amount=Decimal(membership.subscription.price)
+                amount=final_price
             )
             # Accrue loyalty points
             LoyaltyService().accrue_points(
-                user=user, amount=Decimal(membership.subscription.price)
+                user=user, amount=final_price
             )
         NotificationService().send_membership_confirmation(membership)
 

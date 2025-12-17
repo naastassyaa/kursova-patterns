@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db import models
 from django.utils import timezone
 from typing import Optional
+import datetime
 
 from ..models import Promotion, Section, Subscription, User, SportCenter
 
@@ -19,45 +20,58 @@ class PromotionService:
         center: Optional[SportCenter] = None,
     ) -> list[Promotion]:
         now = timezone.now()
+        today = now.date()
 
         promotions = Promotion.objects.filter(
             is_active=True,
             discount_type=discount_type,
-            start_date__lte=now,
-            end_date__gte=now,
         )
+        
+        filtered_promotions = []
+        for promo in promotions:
+            promo_start_date = promo.start_date.date() if promo.start_date else None
+            promo_end_date = promo.end_date.date() if promo.end_date else None
+            if promo_start_date and promo_end_date:
+                if promo_start_date <= today <= promo_end_date:
+                    filtered_promotions.append(promo.id)
+        
+        promotions = promotions.filter(id__in=filtered_promotions)
 
         promotions = promotions.filter(
             models.Q(scope=Promotion.PromotionScope.GENERAL) |
             models.Q(scope=Promotion.PromotionScope.PERSONAL, target_user=user)
         )
 
-        if center:
-            promotions = promotions.filter(
-                models.Q(target_center__isnull=True) |
-                models.Q(target_center=center)
-            )
+        if discount_type == Promotion.DiscountType.BOOKING:
+            if center:
+                promotions = promotions.filter(
+                    models.Q(target_center__isnull=True) |
+                    models.Q(target_center=center)
+                )
 
-        if section:
-            promotions = promotions.filter(
-                models.Q(target_section__isnull=True) |
-                models.Q(target_section=section)
-            )
-        
+            if section:
+                section_id = section.id if hasattr(section, 'id') else section
+                promotions = promotions.filter(
+                    models.Q(target_section__isnull=True) |
+                    models.Q(target_section_id=section_id)
+                )
+            
+            if section:
+                section_age_category = section.ageCategory or ''
+                promotions = promotions.filter(
+                    models.Q(target_age_category__isnull=True) |
+                    models.Q(target_age_category='') |
+                    models.Q(target_age_category=section_age_category)
+                )
 
-        if section:
-            section_age_category = section.ageCategory or ''
-            promotions = promotions.filter(
-                models.Q(target_age_category__isnull=True) |
-                models.Q(target_age_category='') |
-                models.Q(target_age_category=section_age_category)
-            )
-
-        if subscription:
-            promotions = promotions.filter(
-                models.Q(target_subscription__isnull=True) |
-                models.Q(target_subscription=subscription)
-            )
+        if discount_type == Promotion.DiscountType.SUBSCRIPTION:
+            if subscription:
+                promotions = promotions.filter(
+                    models.Q(target_subscription__isnull=True) |
+                    models.Q(target_subscription=subscription)
+                )
+            else:
+                promotions = promotions.filter(target_subscription__isnull=True)
 
         return list(promotions.order_by("-discount_value", "-created_at"))
 

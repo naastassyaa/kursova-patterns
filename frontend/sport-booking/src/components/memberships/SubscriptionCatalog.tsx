@@ -35,18 +35,20 @@ const SubscriptionCatalog = ({
               (plan.perks
                 ? Object.entries(plan.perks).map(([key, value]) => `${key}: ${String(value)}`)
                 : []);
-            const hasDiscount = plan.final_price !== undefined && plan.final_price < parseFloat(plan.price);
+            const basePrice = parseFloat(plan.price);
+            const finalPrice = plan.final_price;
+            const hasDiscount = finalPrice !== undefined && finalPrice !== null && finalPrice < basePrice;
             return (
           <article className="plan-card" key={plan.id}>
             <p className="plan-type">{plan.type}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {hasDiscount && plan.final_price !== undefined ? (
+              {hasDiscount && finalPrice !== undefined && finalPrice !== null ? (
                 <>
                   <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', fontSize: '1.1rem' }}>
                     {formatCurrency(plan.price)}
                   </span>
                   <span className="plan-price" style={{ color: 'var(--success)' }}>
-                    {formatCurrency(plan.final_price.toString())}
+                    {formatCurrency(finalPrice.toString())}
                   </span>
                   {plan.discount_percentage && (
                     <span

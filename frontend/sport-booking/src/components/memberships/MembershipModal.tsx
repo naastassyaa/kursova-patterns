@@ -273,7 +273,7 @@ const MembershipModal = ({ plans, onClose, initialPlanId = null }: MembershipMod
               {activePlan?.duration} днів ·{' '}
               {activePlan ? (
                 <>
-                  {activePlan.final_price !== undefined && activePlan.final_price < parseFloat(activePlan.price) ? (
+                  {activePlan.final_price !== undefined && activePlan.final_price !== null && activePlan.final_price < parseFloat(activePlan.price) ? (
                     <>
                       <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', marginRight: '0.5rem' }}>
                         {formatCurrency(activePlan.price)}

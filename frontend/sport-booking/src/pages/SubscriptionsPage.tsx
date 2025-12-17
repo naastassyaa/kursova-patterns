@@ -25,9 +25,9 @@ const SubscriptionsPage = () => {
     setModalOpen(true);
   };
 
-  const primaryPlan = selectedPlanId ? plans.find((plan) => plan.id === selectedPlanId) ?? null : null;
+  const primaryPlan = selectedPlanId ? plans.find((plan: typeof plans[number]) => plan.id === selectedPlanId) ?? null : null;
   const modalPlanList = primaryPlan
-    ? [primaryPlan, ...plans.filter((plan) => plan.id !== primaryPlan.id)]
+    ? [primaryPlan, ...plans.filter((plan: typeof plans[number]) => plan.id !== primaryPlan.id)]
     : plans;
 
   return (

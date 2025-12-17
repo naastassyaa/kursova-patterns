@@ -27,10 +27,12 @@ const PromotionsList = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('uk-UA', {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('uk-UA', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
+      timeZone: 'UTC',
     });
   };
 
@@ -69,7 +71,7 @@ const PromotionsList = () => {
               {promo.description}
             </p>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-              {formatDiscount(promo) && (
+              {promo.discount_type !== 'INFO' && formatDiscount(promo) && (
                 <span
                   style={{
                     padding: '0.25rem 0.75rem',
@@ -80,7 +82,7 @@ const PromotionsList = () => {
                     fontWeight: 600,
                   }}
                 >
-                  Знижка: {formatDiscount(promo)}
+                  Знижка {promo.discount_type === 'BOOKING' ? 'на бронювання' : promo.discount_type === 'SUBSCRIPTION' ? 'на абонемент' : ''}: {formatDiscount(promo)}
                 </span>
               )}
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>

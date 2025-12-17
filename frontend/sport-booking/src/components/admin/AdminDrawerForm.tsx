@@ -43,6 +43,9 @@ const AdminDrawerForm = ({ fields, initialValues, onSubmit, onClose, title }: Ad
       if (field.name === 'target_user' && processed.target_user_email) {
         processed[field.name] = processed.target_user_email;
       }
+      if (field.name === 'target_subscription' && processed.target_subscription) {
+        processed[field.name] = processed.target_subscription;
+      }
     });
     
     return processed;
@@ -187,11 +190,11 @@ const AdminDrawerForm = ({ fields, initialValues, onSubmit, onClose, title }: Ad
           payload[field.name] = Number.isNaN(maybeNumber) ? value : maybeNumber;
         }
       } else if (field.type === 'date') {
-
         if (value) {
-
-          const dateStr = value.includes('T') ? value : `${value}T00:00:00`;
-          payload[field.name] = new Date(dateStr).toISOString();
+          const dateStr = value.includes('T') ? value : `${value}T00:00:00Z`;
+          payload[field.name] = dateStr;
+        } else {
+          payload[field.name] = null;
         }
       } else {
         payload[field.name] = value;

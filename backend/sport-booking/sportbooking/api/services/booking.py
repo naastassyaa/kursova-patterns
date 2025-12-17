@@ -2,25 +2,30 @@ from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 import re
-from datetime import date
+from datetime import date, datetime
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from ..models import Booking, Payment, Promotion, ScheduleSlot, Subscription, User, UserMembership
+from ..models import Booking, Payment, ScheduleSlot, Subscription, User, UserMembership
 from .loyalty import LoyaltyService
 from .notifications import NotificationService
 from .payments import PaymentService
-from .promotions import PromotionService
 
 
 class BookingService:
     """Coordinates booking workflow using GRASP Controller approach."""
 
-    MEMBERSHIP_DISCOUNTS = {
-        Subscription.SubscriptionType.MONTHLY: Decimal("0.95"),
-        Subscription.SubscriptionType.PREMIUM: Decimal("0.85"),
+    FREE_CLASSES_PER_MONTH = {
+        Subscription.SubscriptionType.MONTHLY: 8,
+        Subscription.SubscriptionType.PREMIUM: 16,
+        Subscription.SubscriptionType.CORPORATE: 0,
+    }
+    
+    DISCOUNT_AFTER_FREE = {
+        Subscription.SubscriptionType.MONTHLY: Decimal("0.50"),
+        Subscription.SubscriptionType.PREMIUM: Decimal("0.50"),
         Subscription.SubscriptionType.CORPORATE: Decimal("0.75"),
     }
 
@@ -28,7 +33,6 @@ class BookingService:
         self.payment_service = PaymentService()
         self.loyalty_service = LoyaltyService()
         self.notification_service = NotificationService()
-        self.promotion_service = PromotionService()
 
     def create_booking(
         self,
@@ -62,7 +66,6 @@ class BookingService:
                 
                 age = self._calculate_age(user.date_of_birth)
                 
-                # Extract age range from ageCategory (e.g., "Діти 8-12" -> 8, 12)
                 age_match = re.search(r'(\d+)-(\d+)', age_category)
                 if age_match:
                     min_age = int(age_match.group(1))
@@ -142,21 +145,7 @@ class BookingService:
 
     def _calculate_price(self, user: User, slot: ScheduleSlot) -> Decimal:
         base_price = slot.section.base_price or Decimal("0.00")
-        discount_multiplier = self._membership_discount(user)
-        price_with_membership = (base_price * discount_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         
-
-        final_price, discount, _ = self.promotion_service.get_final_price(
-            base_price=price_with_membership,
-            user=user,
-            discount_type=Promotion.DiscountType.BOOKING,
-            section=slot.section,
-            center=slot.hall.center if slot.hall else None,
-        )
-        
-        return final_price
-
-    def _membership_discount(self, user: User) -> Decimal:
         today = timezone.now().date()
         membership = (
             user.memberships.filter(
@@ -166,9 +155,35 @@ class BookingService:
             .order_by("-end_date")
             .first()
         )
-        if membership:
-            return self.MEMBERSHIP_DISCOUNTS.get(membership.subscription.type, Decimal("1.00"))
-        return Decimal("1.00")
+        
+        if not membership:
+            return base_price
+        
+        subscription_type = membership.subscription.type
+        free_classes = self.FREE_CLASSES_PER_MONTH.get(subscription_type, 0)
+        
+        if free_classes == 0:
+            discount_multiplier = self.DISCOUNT_AFTER_FREE.get(subscription_type, Decimal("1.00"))
+            return (base_price * discount_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        
+        current_month_start = today.replace(day=1)
+        if today.month == 12:
+            next_month_start = today.replace(year=today.year + 1, month=1, day=1)
+        else:
+            next_month_start = today.replace(month=today.month + 1, day=1)
+        
+        bookings_this_month = Booking.objects.filter(
+            user=user,
+            schedule_slot__start_time__gte=datetime.combine(current_month_start, datetime.min.time()),
+            schedule_slot__start_time__lt=datetime.combine(next_month_start, datetime.min.time()),
+            status__in=[Booking.BookingStatus.PENDING, Booking.BookingStatus.CONFIRMED],
+        ).count()
+        
+        if bookings_this_month < free_classes:
+            return Decimal("0.00")
+        
+        discount_multiplier = self.DISCOUNT_AFTER_FREE.get(subscription_type, Decimal("1.00"))
+        return (base_price * discount_multiplier).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     def _calculate_age(self, date_of_birth: date) -> int:
         """Calculate age from date of birth."""

@@ -96,15 +96,18 @@ const BookingDrawer = ({ slotId, onClose }: BookingDrawerProps) => {
   const discountMultiplier =
     (membership && MEMBERSHIP_DISCOUNTS[membership.subscription_detail.type]) ?? 1;
 
-  const expectedPrice = slotQuery.data
-    ? formatCurrency(Number(slotQuery.data.section.base_price) * discountMultiplier)
-    : null;
+  const slot = slotQuery.data;
+  const basePrice = slot ? Number(slot.price || slot.section.base_price) : 0;
+  const hasPromotion = slot?.final_price !== undefined && slot?.final_price !== null && slot.final_price < basePrice;
+  const finalPrice = hasPromotion && slot?.final_price !== undefined ? slot.final_price : (basePrice * discountMultiplier);
+  
+  const expectedPrice = slot && typeof finalPrice === 'number' ? formatCurrency(finalPrice) : null;
 
   if (!slotId) {
     return null;
   }
 
-  if (slotQuery.isLoading || !slotQuery.data) {
+  if (slotQuery.isLoading || !slotQuery.data || !slot) {
     return (
       <div className="drawer-backdrop" onClick={onClose}>
         <div className="booking-drawer" onClick={(event) => event.stopPropagation()}>
@@ -114,8 +117,7 @@ const BookingDrawer = ({ slotId, onClose }: BookingDrawerProps) => {
     );
   }
 
-  const slot = slotQuery.data;
-  const isSoldOut = slot?.available_spots !== undefined && slot.available_spots <= 0;
+  const isSoldOut = slot.available_spots !== undefined && slot.available_spots <= 0;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -186,14 +188,47 @@ const BookingDrawer = ({ slotId, onClose }: BookingDrawerProps) => {
             </div>
             <div>
               <p className="stat-card__label">Очікувана вартість</p>
-              <span className="stat-card__value">{expectedPrice ?? '—'}</span>
-              {membership ? (
-                <p className="stat-card__label">
-                  {membership.subscription_detail.type} · множник ×{discountMultiplier.toFixed(2)}
+              <span className="stat-card__value">
+                {slot && hasPromotion && slot.final_price !== undefined ? (
+                  <>
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)', marginRight: '0.5rem' }}>
+                      {formatCurrency(basePrice)}
+                    </span>
+                    <span style={{ color: 'var(--success)', fontWeight: 600 }}>
+                      {formatCurrency(slot.final_price)}
+                    </span>
+                    {slot.discount_percentage && (
+                      <span
+                        style={{
+                          marginLeft: '0.5rem',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: '0.5rem',
+                          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                          color: 'var(--success)',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        -{Math.round(slot.discount_percentage)}%
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  expectedPrice ?? '—'
+                )}
+              </span>
+              {slot?.promotion && (
+                <p className="stat-card__label" style={{ color: 'var(--primary)', fontSize: '0.85rem' }}>
+                  🎉 {slot.promotion.title}
                 </p>
-              ) : (
-                <p className="stat-card__label">Без абонемента</p>
               )}
+              {membership && !hasPromotion && discountMultiplier < 1 ? (
+                <p className="stat-card__label">
+                  Знижка від абонементу {membership.subscription_detail.type}: {Math.round((1 - discountMultiplier) * 100)}%
+                </p>
+              ) : !membership && !hasPromotion ? (
+                <p className="stat-card__label">Без абонемента</p>
+              ) : null}
             </div>
             <div>
               <p className="stat-card__label">Дата</p>

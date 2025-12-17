@@ -103,12 +103,8 @@ const PersonalTrainingModal = ({ trainerId, onClose }: PersonalTrainingModalProp
     return membershipQuery.data.find((item) => item.status === 'ACTIVE') ?? membershipQuery.data[0];
   }, [membershipQuery.data]);
 
-  const discountMultiplier =
-    (membership && MEMBERSHIP_DISCOUNTS[membership.subscription_detail.type]) ?? 1;
-
-  // Base price for personal training (assuming 1500 UAH, can be adjusted)
   const basePrice = 1500;
-  const finalPrice = basePrice * discountMultiplier;
+  const finalPrice = basePrice;
 
   const mutation = useMutation({
     mutationFn: createBooking,
@@ -275,11 +271,6 @@ const PersonalTrainingModal = ({ trainerId, onClose }: PersonalTrainingModalProp
               </label>
               <p style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--primary)' }}>
                 {formatCurrency(finalPrice)}
-                {membership && (
-                  <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
-                    (з урахуванням знижки)
-                  </span>
-                )}
               </p>
             </div>
 
