@@ -9,6 +9,7 @@ import CustomSelect from '../components/common/CustomSelect';
 import PersonalTrainingModal from '../components/coaches/PersonalTrainingModal';
 import { useAuth } from '../context/AuthContext';
 import type { Trainer as CatalogTrainer } from '../types/catalog';
+import { formatCurrency } from '../utils/formatters';
 
 const CoachesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -204,6 +205,16 @@ const CoachesPage = () => {
                   </div>
                   <p style={{ margin: '0.2rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                     Досвід {trainer.experience_years}+ років
+                  </p>
+                  <p
+                    style={{
+                      margin: '0.2rem 0 0',
+                      color: 'var(--primary)',
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Персональне тренування: {formatCurrency(1500)} (2 безкоштовні у Преміум)
                   </p>
                 </div>
               </div>

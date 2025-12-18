@@ -18,6 +18,21 @@ const PromotionsList = () => {
     return null;
   }
 
+  const formatTarget = (promo: Promotion) => {
+    if (promo.discount_type !== 'SUBSCRIPTION') return null;
+    if (!promo.target_subscription) {
+      return 'Для всіх абонементів';
+    }
+    const typeMap: Record<string, string> = {
+      MONTHLY: 'для Місячного абонементу',
+      PREMIUM: 'для Преміум абонементу',
+      CORPORATE: 'для Корпоративного абонементу',
+      SINGLE: 'для разового відвідування',
+    };
+    const rawType = promo.target_subscription_type ?? '';
+    return typeMap[rawType] ?? `для абонементу типу ${rawType}`;
+  };
+
   const formatDiscount = (promo: Promotion) => {
     if (!promo.discount_value) return null;
     if (promo.discount_value_type === 'PERCENTAGE') {
@@ -67,9 +82,12 @@ const PromotionsList = () => {
                 </span>
               )}
             </div>
-            <p style={{ margin: '0.5rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              {promo.description}
-            </p>
+            <p style={{ margin: '0.5rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>{promo.description}</p>
+            {promo.discount_type === 'SUBSCRIPTION' && (
+              <p style={{ margin: '0.25rem 0 0', color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 500 }}>
+                {formatTarget(promo)}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
               {promo.discount_type !== 'INFO' && formatDiscount(promo) && (
                 <span

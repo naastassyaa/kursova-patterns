@@ -127,6 +127,8 @@ export type Promotion = {
   target_section?: number | null;
   target_center?: number | null;
   target_age_category?: string | null;
+   target_subscription?: number | null;
+   target_subscription_type?: string | null;
 };
 
 export const fetchMyPromotions = async () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +18,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 const LoginPage = () => {
   const { login, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [serverError, setServerError] = useState<string | null>(null);
   const {
     register,
@@ -34,7 +33,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      navigate('/account', { replace: true });
+      navigate('/', { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate]);
 
@@ -48,9 +47,7 @@ const LoginPage = () => {
       clearCurrentProfile();
       await login(values);
       ensureProfileForEmail(values.email);
-      const redirectTo =
-        (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/account';
-      navigate(redirectTo, { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       setServerError('Невірні дані або сервер недоступний.');
       console.error(error);

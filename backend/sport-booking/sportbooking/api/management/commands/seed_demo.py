@@ -522,19 +522,29 @@ class Command(BaseCommand):
                 for day_offset in range(1, 8):
                     target_date = now + timedelta(days=day_offset)
                     if target_date.weekday() == target_day_of_week:
+                        # Базовий час початку
                         start = target_date.replace(hour=target_hour, minute=0, second=0, microsecond=0)
                         end = start + timedelta(hours=1)
 
-                        slot = ScheduleSlot.objects.create(
-                            section=section,
-                            hall=hall,
-                            trainer=trainer,
-                            start_time=start,
-                            end_time=end,
-                            capacity=section.capacity,
-                            available_spots=section.capacity,
-                        )
-                        slots.append(slot)
+                        # Уникаємо накладок: якщо в цьому залі на цю годину вже є слот,
+                        # зсуваємо час на +1 годину, поки не знайдемо вільний або не вийдемо за межі дня
+                        max_hour = 21
+                        while ScheduleSlot.objects.filter(hall=hall, start_time=start).exists() and start.hour < max_hour:
+                            start = start + timedelta(hours=1)
+                            end = start + timedelta(hours=1)
+
+                        # Якщо знайшли вільний час у межах дня – створюємо слот
+                        if start.hour <= max_hour and not ScheduleSlot.objects.filter(hall=hall, start_time=start).exists():
+                            slot = ScheduleSlot.objects.create(
+                                section=section,
+                                hall=hall,
+                                trainer=trainer,
+                                start_time=start,
+                                end_time=end,
+                                capacity=section.capacity,
+                                available_spots=section.capacity,
+                            )
+                            slots.append(slot)
                         break
 
         return slots

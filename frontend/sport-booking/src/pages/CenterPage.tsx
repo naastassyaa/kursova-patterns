@@ -39,14 +39,6 @@ const CenterPage = () => {
     queryFn: () => fetchSections({}),
   });
 
-  const {
-    data: allSlots,
-    isLoading: slotsLoading,
-  } = useQuery({
-    queryKey: ['schedule-slots', 'center', numericId],
-    queryFn: () => fetchScheduleSlots({}),
-  });
-
   const centerInfo = useMemo(() => {
     if (!halls) return null;
     return halls.find((hall) => hall.center.id === numericId)?.center ?? null;
@@ -63,7 +55,16 @@ const CenterPage = () => {
     return sections.filter((section) => hallNames.includes(section.hall_name));
   }, [sections, centerHalls]);
 
-  // Розклад на тиждень для цього центру (групування за днем тижня)
+  const {
+    data: allSlots,
+    isLoading: slotsLoading,
+  } = useQuery({
+    queryKey: ['schedule-slots', 'center', numericId, centerInfo?.city],
+    queryFn: () => fetchScheduleSlots(centerInfo ? { city: centerInfo.city } : {}),
+    enabled: Boolean(centerInfo),
+  });
+
+  // Розклад для центру (групування за днем тижня, Пн–Сб, без прив'язки до конкретної дати)
   const weekSchedule = useMemo(() => {
     if (!allSlots || !centerInfo) return new Map();
 
@@ -76,7 +77,7 @@ const CenterPage = () => {
       scheduleByDayOfWeek.set(dayOfWeek, []);
     });
 
-    // Фільтруємо слоти для цього центру та групуємо за днем тижня
+    // Фільтруємо слоти для цього центру та групуємо за днем тижня (без фільтра по тижню)
     allSlots.forEach((slot) => {
       const slotCenterId = slot.hall.center.id;
       
@@ -255,53 +256,6 @@ const CenterPage = () => {
               })}
             </div>
 
-            {/* Неділя */}
-            {(() => {
-              const daySlots = weekSchedule.get(0) || [];
-              const dayName = dayjs().day(0).format('dddd');
-              
-              if (daySlots.length === 0) return null;
-              
-              return (
-                <div
-                  style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    borderRadius: '0.5rem',
-                    padding: '0.75rem',
-                    maxWidth: '400px',
-                  }}
-                >
-                  <div style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
-                    <strong style={{ display: 'block', fontSize: '0.95rem', textTransform: 'capitalize' }}>
-                      {dayName}
-                    </strong>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    {daySlots.map((slot: ScheduleSlot) => (
-                      <div
-                        key={slot.id}
-                        style={{
-                          padding: '0.5rem',
-                          fontSize: '0.8rem',
-                          backgroundColor: 'var(--bg-primary)',
-                          borderRadius: '0.25rem',
-                        }}
-                      >
-                        <strong style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
-                          {slot.section.sportType}
-                        </strong>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>
-                          {slot.hall.name}
-                        </span>
-                        <span style={{ display: 'block', fontWeight: 600, fontSize: '0.75rem' }}>
-                          {formatTime(slot.start_time)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
       </section>

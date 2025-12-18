@@ -163,7 +163,16 @@ const resources: AdminResourceConfig[] = [
       {
         key: 'start_time',
         label: 'Початок',
-        render: (row) => new Date(row.start_time).toLocaleString(),
+        render: (row) => {
+          if (!row.start_time) return '—';
+          const date = new Date(row.start_time);
+          const weekday = date.toLocaleDateString('uk-UA', { weekday: 'long' });
+          const time = date.toLocaleTimeString('uk-UA', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          return `${weekday}, ${time}`;
+        },
       },
       { key: 'capacity', label: 'Місткість' },
       { key: 'available_spots', label: 'Вільно' },

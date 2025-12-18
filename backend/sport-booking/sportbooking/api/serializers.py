@@ -343,6 +343,9 @@ class PromotionSerializer(serializers.ModelSerializer):
 
 
 class PublicPromotionSerializer(serializers.ModelSerializer):
+    target_subscription = serializers.PrimaryKeyRelatedField(read_only=True)
+    target_subscription_type = serializers.CharField(source="target_subscription.type", read_only=True)
+
     class Meta:
         model = Promotion
         fields = [
@@ -358,11 +361,13 @@ class PublicPromotionSerializer(serializers.ModelSerializer):
             "target_section",
             "target_center",
             "target_age_category",
+            "target_subscription",
+            "target_subscription_type",
         ]
 
 
 class BookingSerializer(serializers.ModelSerializer):
-    schedule_slot = PublicScheduleSlotSerializer(read_only=True)
+    schedule_slot_detail = PublicScheduleSlotSerializer(source="schedule_slot", read_only=True)
 
     class Meta:
         model = Booking
@@ -380,9 +385,45 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 class ScheduleSlotSerializer(serializers.ModelSerializer):
     """Serializer for managing schedule slots in admin panel."""
 
+    # Read-only деталі для відображення в адмінці
+    section = SectionSerializer(read_only=True)
+    hall = GymHallSerializer(read_only=True)
+    trainer = TrainerSerializer(read_only=True)
+
+    # Write-only ID для створення/редагування
+    section_id = serializers.PrimaryKeyRelatedField(
+        queryset=Section.objects.all(),
+        source="section",
+        write_only=True,
+    )
+    hall_id = serializers.PrimaryKeyRelatedField(
+        queryset=GymHall.objects.all(),
+        source="hall",
+        write_only=True,
+    )
+    trainer_id = serializers.PrimaryKeyRelatedField(
+        queryset=Trainer.objects.all(),
+        source="trainer",
+        write_only=True,
+        allow_null=True,
+        required=False,
+    )
+
     class Meta:
         model = ScheduleSlot
-        fields = "__all__"
+        fields = [
+            "id",
+            "section",
+            "hall",
+            "trainer",
+            "start_time",
+            "end_time",
+            "capacity",
+            "available_spots",
+            "section_id",
+            "hall_id",
+            "trainer_id",
+        ]
 
 
 class NotificationSerializer(serializers.ModelSerializer):
